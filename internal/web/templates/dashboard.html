@@ -1,0 +1,15 @@
+{{define "content"}}
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-bold">Dashboard <span class="text-gray-400 font-normal text-base">· {{formatMonth .Month}}</span></h1>
+    <button class="px-4 py-1.5 text-sm rounded bg-blue-700 text-white"
+            hx-get="/transactions/new" hx-target="#modal" hx-swap="innerHTML">+ Add Transaction <span class="opacity-60">(n)</span></button>
+  </div>
+
+  <section><h2 class="text-sm font-semibold text-gray-500 mb-2">Overview</h2>{{template "kpi_strip" .}}</section>
+  <section><h2 class="text-sm font-semibold text-gray-500 mb-2">Pay Cycle</h2>{{template "paycycle_strip" .}}</section>
+  {{if .Goals}}<section><h2 class="text-sm font-semibold text-gray-500 mb-2">Goals</h2>{{template "goals_list" .}}</section>{{end}}
+  <section><h2 class="text-sm font-semibold text-gray-500 mb-2">Charts</h2>{{template "charts" .}}</section>
+  <section><h2 class="text-sm font-semibold text-gray-500 mb-2">Recent Activity</h2>{{template "recent_activity" .}}</section>
+</div>
+{{end}}

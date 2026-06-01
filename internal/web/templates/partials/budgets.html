@@ -1,0 +1,38 @@
+{{define "budget_table"}}
+<div id="budgets-list">
+  <table class="w-full text-sm">
+    <thead><tr class="text-left text-gray-500 border-b dark:border-gray-700">
+      <th class="px-2 py-1">Category</th><th class="px-2 py-1 text-right">Spent (this month)</th>
+      <th class="px-2 py-1 text-right">Limit</th><th class="px-2 py-1">Progress</th><th class="px-2 py-1"></th>
+    </tr></thead>
+    <tbody>
+      {{- if .Budgets}}
+      {{- range .Budgets}}
+      <tr class="border-b dark:border-gray-700">
+        <td class="px-2 py-1">{{.Category}}</td>
+        <td class="px-2 py-1 num text-right {{if .Over}}text-red-600 font-semibold{{end}}">{{formatINR .Spent}}{{if .Over}} ⚠{{end}}</td>
+        <td class="px-2 py-1 num text-right">{{formatINR .Limit}}</td>
+        <td class="px-2 py-1">
+          <div class="h-2 rounded bg-gray-200 dark:bg-gray-700 overflow-hidden w-32">
+            <div class="h-2 {{if .Over}}bg-red-600{{else}}bg-green-600{{end}}" style="width: {{barPct .Pct}}%"></div>
+          </div>
+        </td>
+        <td class="px-2 py-1 text-right">
+          <button class="text-red-600 text-sm" hx-post="/budgets/{{.Category}}/delete" hx-target="#budgets-list" hx-swap="outerHTML" hx-confirm="Remove budget for {{.Category}}?">🗑</button>
+        </td>
+      </tr>
+      {{- end}}
+      {{- else}}
+      <tr><td colspan="5" class="text-center text-gray-500 py-6">No budgets set.</td></tr>
+      {{- end}}
+    </tbody>
+  </table>
+  <form class="flex flex-wrap gap-2 mt-3" hx-post="/budgets" hx-target="#budgets-list" hx-swap="outerHTML">
+    <select name="category" class="border rounded px-2 py-1.5 text-sm dark:bg-gray-700 dark:border-gray-600">
+      {{range .Categories}}<option>{{.Name}}</option>{{end}}
+    </select>
+    <input type="number" step="0.01" min="0.01" name="limit" placeholder="Monthly limit ₹" class="border rounded px-2 py-1.5 text-sm num w-40 dark:bg-gray-700 dark:border-gray-600">
+    <button class="px-3 py-1.5 text-sm rounded bg-blue-700 text-white">Set budget</button>
+  </form>
+</div>
+{{end}}

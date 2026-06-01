@@ -1,0 +1,36 @@
+{{define "sankey"}}
+<div id="sankey" hx-get="/year/detail?y={{.Year}}" hx-trigger="txChanged from:body" hx-swap="outerHTML">
+  {{- if gt (rupees .Income) 0.0}}
+  <div class="grid grid-cols-3 gap-3 mb-4">
+    <div class="card bg-white dark:bg-gray-800 p-4"><div class="text-xs uppercase text-gray-500">Income {{.Year}}</div><div class="num text-xl font-bold text-green-600">{{formatINR .Income}}</div></div>
+    <div class="card bg-white dark:bg-gray-800 p-4"><div class="text-xs uppercase text-gray-500">Spent</div><div class="num text-xl font-bold text-red-600">{{formatINR .Expense}}</div></div>
+    <div class="card bg-yellow-50 dark:bg-gray-800 p-4"><div class="text-xs uppercase text-gray-500">Saved ({{pct .SavedPct}})</div><div class="num text-xl font-bold {{amountClass .Saved}}">{{formatINR .Saved}}</div></div>
+  </div>
+
+  <p class="text-sm text-gray-500 mb-1">Where {{.Year}} income went</p>
+  <div class="flex h-12 rounded overflow-hidden border dark:border-gray-700">
+    {{- range $i, $f := .Flows}}
+    <div style="width: {{barPct $f.Pct}}%; background: {{flowColor $i}}" title="{{$f.Category}}: {{formatINR $f.Amount}}"></div>
+    {{- end}}
+    {{- if gt (barPct .SavedPct) 0}}
+    <div style="width: {{barPct .SavedPct}}%; background: #9ca3af" title="Saved"></div>
+    {{- end}}
+  </div>
+
+  <div class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1 mt-4 text-sm">
+    {{- range $i, $f := .Flows}}
+    <div class="flex items-center justify-between">
+      <span class="flex items-center gap-2"><span class="inline-block w-3 h-3 rounded" style="background: {{flowColor $i}}"></span>{{$f.Category}}</span>
+      <span class="num text-gray-500">{{formatINR $f.Amount}} · {{pct $f.Pct}}</span>
+    </div>
+    {{- end}}
+    <div class="flex items-center justify-between">
+      <span class="flex items-center gap-2"><span class="inline-block w-3 h-3 rounded" style="background: #9ca3af"></span>Saved</span>
+      <span class="num text-gray-500">{{formatINR .Saved}} · {{pct .SavedPct}}</span>
+    </div>
+  </div>
+  {{- else}}
+  <p class="text-gray-500 py-10 text-center">No income recorded for {{.Year}}.</p>
+  {{- end}}
+</div>
+{{end}}

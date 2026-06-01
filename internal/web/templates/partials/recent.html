@@ -1,0 +1,23 @@
+{{define "recent_activity"}}
+<div id="recent" hx-get="/partials/recent" hx-trigger="txChanged from:body" hx-swap="outerHTML"
+     class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  <div class="card bg-white dark:bg-gray-800 p-4 overflow-x-auto">
+    <h3 class="text-sm font-semibold mb-2">Recent Transactions</h3>
+    <table class="w-full text-sm">
+      <thead><tr class="text-left text-gray-500 border-b dark:border-gray-700"><th class="px-2 py-1">Date</th><th class="px-2 py-1">Description</th><th class="px-2 py-1 text-right">Amount</th><th class="px-2 py-1">Category</th></tr></thead>
+      <tbody>
+        {{range .Recent}}<tr class="border-b dark:border-gray-700"><td class="px-2 py-1 num">{{formatDate .Date}}</td><td class="px-2 py-1">{{.Description}}</td><td class="px-2 py-1 num text-right">{{formatINR .Amount}}</td><td class="px-2 py-1">{{.Category}}</td></tr>{{else}}<tr><td colspan="4" class="text-center text-gray-500 py-6">No transactions yet.</td></tr>{{end}}
+      </tbody>
+    </table>
+  </div>
+  <div class="card bg-white dark:bg-gray-800 p-4 overflow-x-auto">
+    <h3 class="text-sm font-semibold mb-2">Top 5 Largest Expenses</h3>
+    <table class="w-full text-sm">
+      <thead><tr class="text-left text-gray-500 border-b dark:border-gray-700"><th class="px-2 py-1">Description</th><th class="px-2 py-1 text-right">Amount</th><th class="px-2 py-1">Date</th><th class="px-2 py-1">Category</th></tr></thead>
+      <tbody>
+        {{range .Top}}<tr class="border-b dark:border-gray-700"><td class="px-2 py-1">{{.Description}}</td><td class="px-2 py-1 num text-right text-red-600">{{formatINR .Amount}}</td><td class="px-2 py-1 num">{{formatDate .Date}}</td><td class="px-2 py-1">{{.Category}}</td></tr>{{else}}<tr><td colspan="4" class="text-center text-gray-500 py-6">No expenses yet.</td></tr>{{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

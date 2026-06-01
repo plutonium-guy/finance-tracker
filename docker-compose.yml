@@ -1,0 +1,16 @@
+services:
+  finance-tracker:
+    build: .
+    image: finance-tracker:latest
+    container_name: finance-tracker
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      DB_PATH: "/data/finance.db"
+      SEED_DEMO: "false"                              # set true once to load demo data
+      TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:-}"   # optional: add txns from Telegram
+      TELEGRAM_ALLOWED_CHAT: "${TELEGRAM_ALLOWED_CHAT:-}"
+    volumes:
+      - ./data:/data                                 # SQLite DB persists on the host
+    restart: unless-stopped

@@ -1,0 +1,20 @@
+{{define "content"}}
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-bold">Planning</h1>
+    <button class="px-4 py-1.5 text-sm rounded bg-blue-700 text-white" hx-get="/goals/new" hx-target="#modal" hx-swap="innerHTML">+ Add Goal</button>
+  </div>
+
+  <section>
+    <h2 class="text-sm font-semibold text-gray-500 mb-2">Savings Goals</h2>
+    {{template "goals_list" .}}
+  </section>
+
+  <section>
+    <h2 class="text-sm font-semibold text-gray-500 mb-2">Budgets <span class="font-normal">· {{formatMonth .Month}}</span></h2>
+    <div class="card bg-white dark:bg-gray-800 p-4 overflow-x-auto">
+      {{template "budget_table" .}}
+    </div>
+  </section>
+</div>
+{{end}}

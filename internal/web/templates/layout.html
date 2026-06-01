@@ -1,0 +1,87 @@
+{{define "layout"}}<!doctype html>
+<html lang="en" x-data="{ dark: {{if .Settings.DarkMode}}true{{else}}false{{end}} }"
+      :class="{ 'dark': dark }"
+      x-init="document.documentElement.classList.toggle('dark', dark); $watch('dark', v => document.documentElement.classList.toggle('dark', v))">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}} · Finance Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/htmx.min.js" defer></script>
+  <script src="/static/chart.umd.js"></script>
+  <script src="/static/charts.js" defer></script>
+  <script src="/static/alpine.min.js" defer></script>
+</head>
+<body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 min-h-screen">
+
+  <nav class="border-b bg-white dark:bg-gray-800 dark:border-gray-700 sticky top-0 z-30">
+    <div class="max-w-6xl mx-auto px-4 flex items-center gap-1 h-14">
+      <a href="/" class="font-bold text-blue-800 dark:text-blue-300 mr-4">₹ Finance</a>
+      {{- $a := .Active}}
+      <a href="/"             class="px-3 py-1.5 rounded text-sm {{if eq $a "dashboard"}}bg-blue-50 text-blue-800 dark:bg-gray-700{{end}}">Dashboard</a>
+      <a href="/transactions" class="px-3 py-1.5 rounded text-sm {{if eq $a "transactions"}}bg-blue-50 text-blue-800 dark:bg-gray-700{{end}}">Transactions</a>
+      <a href="/recurring"    class="px-3 py-1.5 rounded text-sm {{if eq $a "recurring"}}bg-blue-50 text-blue-800 dark:bg-gray-700{{end}}">Recurring</a>
+      <a href="/month"        class="px-3 py-1.5 rounded text-sm {{if eq $a "month"}}bg-blue-50 text-blue-800 dark:bg-gray-700{{end}}">Monthly</a>
+      <a href="/planning"     class="px-3 py-1.5 rounded text-sm {{if eq $a "planning"}}bg-blue-50 text-blue-800 dark:bg-gray-700{{end}}">Planning</a>
+      <a href="/year"         class="px-3 py-1.5 rounded text-sm {{if eq $a "year"}}bg-blue-50 text-blue-800 dark:bg-gray-700{{end}}">Year</a>
+      <a href="/settings"     class="px-3 py-1.5 rounded text-sm {{if eq $a "settings"}}bg-blue-50 text-blue-800 dark:bg-gray-700{{end}}">Settings</a>
+      <button @click="dark=!dark" class="ml-auto px-2 py-1.5 rounded text-sm" title="Toggle dark mode"><span x-text="dark ? '☀️' : '🌙'"></span></button>
+    </div>
+  </nav>
+
+  <main class="max-w-6xl mx-auto px-4 py-6">
+    <div id="flash"></div>
+    {{template "content" .}}
+  </main>
+
+  <!-- Modal shell: htmx loads a fragment into #modal; vanilla JS shows/hides it -->
+  <div id="modal-overlay" class="hidden fixed inset-0 z-40 flex items-start justify-center p-4 bg-black/40 overflow-y-auto">
+    <div id="modal" class="w-full max-w-lg mt-10"></div>
+  </div>
+
+  <script>
+    (function () {
+      var overlay = document.getElementById('modal-overlay');
+      var modal = document.getElementById('modal');
+      function openModal() { overlay.classList.remove('hidden'); }
+      function closeModal() { overlay.classList.add('hidden'); modal.innerHTML = ''; }
+      window.closeModal = closeModal;
+
+      // Show the modal whenever a fragment is swapped into #modal.
+      document.body.addEventListener('htmx:afterSwap', function (e) {
+        if (e.detail.target && e.detail.target.id === 'modal') openModal();
+      });
+      // Close after a successful submit that originated inside the modal —
+      // unless the server retargeted back to the modal (validation re-render).
+      document.body.addEventListener('htmx:afterRequest', function (e) {
+        if (!e.detail.successful) return;
+        if (!modal.contains(e.detail.elt)) return;
+        var xhr = e.detail.xhr;
+        if (xhr && xhr.getResponseHeader('HX-Retarget')) return;
+        closeModal();
+      });
+      // Close via backdrop click or any [data-modal-close] control.
+      overlay.addEventListener('click', function (e) { if (e.target === overlay) closeModal(); });
+      document.body.addEventListener('click', function (e) {
+        if (e.target.closest('[data-modal-close]')) closeModal();
+      });
+
+      // Keyboard shortcuts: n = new transaction, / = focus search, Esc = close.
+      document.addEventListener('keydown', function (e) {
+        var typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+        if (e.key === 'Escape') { closeModal(); return; }
+        if (typing) return;
+        if (e.key === 'n') {
+          e.preventDefault();
+          if (window.htmx) htmx.ajax('GET', '/transactions/new', { target: '#modal', swap: 'innerHTML' });
+        } else if (e.key === '/') {
+          var s = document.getElementById('search');
+          if (s) { e.preventDefault(); s.focus(); }
+        }
+      });
+    })();
+  </script>
+</body>
+</html>{{end}}

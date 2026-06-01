@@ -1,0 +1,7 @@
+/finance-tracker
+/tailwindcss
+*.db
+telegram_offset
+.env
+._*
+.DS_Store

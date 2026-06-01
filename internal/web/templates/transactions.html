@@ -1,0 +1,73 @@
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-bold">Transactions</h1>
+    <div class="flex gap-2 items-center flex-wrap">
+      <form hx-post="/transactions/import" hx-encoding="multipart/form-data" hx-target="#flash" hx-swap="innerHTML" class="flex gap-1 items-center">
+        <input type="file" name="file" accept=".csv,text/csv" required class="text-xs w-40"
+               title="CSV: app export or a bank statement (Date, Description, Amount or Debit/Credit)">
+        <button class="px-2 py-1.5 text-sm rounded border">Import</button>
+      </form>
+      <a class="px-3 py-1.5 text-sm rounded border" href="/transactions/export"
+         onclick="this.href='/transactions/export?'+new URLSearchParams(new FormData(document.getElementById('filters')))">Export CSV</a>
+      <button class="px-4 py-1.5 text-sm rounded bg-blue-700 text-white" hx-get="/transactions/new" hx-target="#modal" hx-swap="innerHTML">+ Add</button>
+    </div>
+  </div>
+
+  <form id="filters" class="card bg-white dark:bg-gray-800 p-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-sm"
+        hx-get="/transactions/list" hx-target="#tx-rows" hx-swap="innerHTML" hx-trigger="change, keyup delay:300ms from:#search">
+    <input id="search" name="q" placeholder="Search description… (/)" class="border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">
+    <select name="category" class="border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">
+      <option value="">All Categories</option>
+      {{range .Categories}}<option>{{.Name}}</option>{{end}}
+    </select>
+    <select name="type" class="border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">
+      <option value="">All Types</option><option>Income</option><option>Expense</option><option>Transfer</option>
+    </select>
+    <select name="paymentMethod" class="border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">
+      <option value="">All Methods</option>
+      {{range .Methods}}<option>{{.}}</option>{{end}}
+    </select>
+    {{if .Tags}}
+    <select name="tag" class="border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">
+      <option value="">All Tags</option>
+      {{range .Tags}}<option>{{.Name}}</option>{{end}}
+    </select>
+    {{end}}
+  </form>
+
+  <!-- Bulk action bar -->
+  <div class="flex flex-wrap items-center gap-2 text-sm">
+    <label class="flex items-center gap-1"><input type="checkbox" id="check-all"
+      onclick="document.querySelectorAll('.tx-check').forEach(c=>c.checked=this.checked)"> Select all</label>
+    <button class="px-2 py-1 rounded border border-red-300 text-red-700"
+      hx-post="/transactions/bulk" hx-vals='{"action":"delete"}' hx-include="#bulkform, #filters"
+      hx-target="#tx-rows" hx-swap="innerHTML" hx-confirm="Delete selected transactions?">Delete selected</button>
+    <select id="bulkCategory" name="bulkCategory" form="bulkform" class="border rounded px-2 py-1 dark:bg-gray-700 dark:border-gray-600">
+      {{range .Categories}}<option>{{.Name}}</option>{{end}}
+    </select>
+    <button class="px-2 py-1 rounded border"
+      hx-post="/transactions/bulk" hx-vals='{"action":"setCategory"}' hx-include="#bulkform, #filters"
+      hx-target="#tx-rows" hx-swap="innerHTML">Set category</button>
+  </div>
+
+  <form id="bulkform" class="card bg-white dark:bg-gray-800 overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="text-left text-gray-500 border-b dark:border-gray-700">
+        <tr>
+          <th class="px-3 py-2"></th>
+          <th class="px-3 py-2">{{template "sorth" (dict "label" "Date" "key" "date")}}</th>
+          <th class="px-3 py-2">{{template "sorth" (dict "label" "Description" "key" "description")}}</th>
+          <th class="px-3 py-2 text-right">{{template "sorth" (dict "label" "Amount" "key" "amount")}}</th>
+          <th class="px-3 py-2">{{template "sorth" (dict "label" "Type" "key" "type")}}</th>
+          <th class="px-3 py-2">Method</th>
+          <th class="px-3 py-2">{{template "sorth" (dict "label" "Category" "key" "category")}}</th>
+          <th class="px-3 py-2">Notes</th><th class="px-3 py-2"></th>
+        </tr>
+      </thead>
+      <tbody id="tx-rows">{{template "tx_table" .}}</tbody>
+    </table>
+  </form>
+  <p class="text-xs text-gray-500">Showing {{len .Txs}} of {{.Total}} transactions.</p>
+</div>
+{{end}}

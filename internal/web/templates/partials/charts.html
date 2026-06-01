@@ -1,0 +1,35 @@
+{{define "charts"}}
+<div id="charts" hx-get="/partials/charts?m={{.Month}}" hx-trigger="txChanged from:body" hx-swap="outerHTML">
+  <script id="chart-data" type="application/json">{{.ChartJSON}}</script>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="card bg-white dark:bg-gray-800 p-4">
+      <h3 class="text-sm font-semibold mb-2">Monthly Income vs Expense</h3>
+      <div class="chart-box"><canvas id="chartIncomeExpense"></canvas></div>
+    </div>
+    <div class="card bg-white dark:bg-gray-800 p-4">
+      <h3 class="text-sm font-semibold mb-2">Net Cash Flow Over Time</h3>
+      <div class="chart-box"><canvas id="chartNet"></canvas></div>
+    </div>
+    <div class="card bg-white dark:bg-gray-800 p-4">
+      <h3 class="text-sm font-semibold mb-2">Pay Cycle: Prev Salary vs Bills</h3>
+      <div class="chart-box"><canvas id="chartPayCycle"></canvas></div>
+    </div>
+    <div class="card bg-white dark:bg-gray-800 p-4">
+      <h3 class="text-sm font-semibold mb-2">Running Pay Cycle Buffer</h3>
+      <div class="chart-box"><canvas id="chartBuffer"></canvas></div>
+    </div>
+    <div class="card bg-white dark:bg-gray-800 p-4">
+      <h3 class="text-sm font-semibold mb-2">Spending by Category (all-time)</h3>
+      <div class="chart-box"><canvas id="chartCategory"></canvas></div>
+    </div>
+    <div class="card bg-white dark:bg-gray-800 p-4">
+      <h3 class="text-sm font-semibold mb-2">Top Spending Categories</h3>
+      <div class="chart-box"><canvas id="chartTopCategories"></canvas></div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "flash"}}
+{{if .}}<div class="card bg-blue-50 border-blue-200 text-blue-800 px-4 py-2 mb-3 text-sm">{{.}}</div>{{end}}
+{{end}}

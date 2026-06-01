@@ -1,0 +1,53 @@
+{{define "kpi_strip"}}
+<div id="kpis" hx-get="/partials/kpis?m={{.Month}}" hx-trigger="txChanged from:body" hx-swap="outerHTML"
+     class="grid grid-cols-2 md:grid-cols-5 gap-3">
+  {{- $k := .KPIs}}
+  <div class="card bg-white dark:bg-gray-800 p-4">
+    <div class="text-xs uppercase text-gray-500">This Month Credits</div>
+    <div class="num text-xl font-bold text-green-600">{{formatINR $k.MonthCredits}}</div>
+  </div>
+  <div class="card bg-white dark:bg-gray-800 p-4">
+    <div class="text-xs uppercase text-gray-500">This Month Debits</div>
+    <div class="num text-xl font-bold text-red-600">{{formatINR $k.MonthDebits}}</div>
+  </div>
+  <div class="card bg-yellow-50 dark:bg-gray-800 p-4">
+    <div class="text-xs uppercase text-gray-500">This Month Net</div>
+    <div class="num text-xl font-bold {{amountClass $k.MonthNet}}">{{formatINR $k.MonthNet}}</div>
+  </div>
+  <div class="card bg-white dark:bg-gray-800 p-4">
+    <div class="text-xs uppercase text-gray-500">YTD Total Debits</div>
+    <div class="num text-xl font-bold text-gray-700 dark:text-gray-200">{{formatINR $k.YTDDebits}}</div>
+  </div>
+  <div class="card bg-white dark:bg-gray-800 p-4">
+    <div class="text-xs uppercase text-gray-500">Savings Rate</div>
+    <div class="num text-xl font-bold text-purple-600">{{pct $k.SavingsRate}}</div>
+  </div>
+</div>
+{{end}}
+
+{{define "paycycle_strip"}}
+<div id="paycycle" hx-get="/partials/paycycle?m={{.Month}}" hx-trigger="txChanged from:body" hx-swap="outerHTML"
+     class="grid grid-cols-2 md:grid-cols-5 gap-3">
+  {{- $p := .PayCycle}}
+  <div class="card bg-white dark:bg-gray-800 p-4">
+    <div class="text-xs uppercase text-gray-500">Last Salary Received</div>
+    <div class="num text-xl font-bold text-green-600">{{formatINR $p.LastSalary}}</div>
+  </div>
+  <div class="card bg-white dark:bg-gray-800 p-4">
+    <div class="text-xs uppercase text-gray-500">This Month Bills</div>
+    <div class="num text-xl font-bold text-red-600">{{formatINR $p.MonthBills}}</div>
+  </div>
+  <div class="card bg-yellow-50 dark:bg-gray-800 p-4">
+    <div class="text-xs uppercase text-gray-500">Pay Cycle Balance</div>
+    <div class="num text-xl font-bold {{amountClass $p.Balance}}">{{formatINR $p.Balance}}</div>
+  </div>
+  <div class="card bg-white dark:bg-gray-800 p-4">
+    <div class="text-xs uppercase text-gray-500">Pay Cycle Savings %</div>
+    <div class="num text-xl font-bold text-purple-600">{{pct $p.SavingsRate}}</div>
+  </div>
+  <div class="card bg-white dark:bg-gray-800 p-4">
+    <div class="text-xs uppercase text-gray-500">Next Salary Date</div>
+    <div class="num text-lg font-bold text-gray-700 dark:text-gray-200">{{if $p.NextSalaryDate}}{{formatDate $p.NextSalaryDate}}{{else}}—{{end}}</div>
+  </div>
+</div>
+{{end}}

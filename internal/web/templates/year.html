@@ -1,0 +1,14 @@
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex items-center justify-between flex-wrap gap-2">
+    <h1 class="text-xl font-bold">Year in Review</h1>
+    <select class="border rounded px-3 py-1.5 text-sm dark:bg-gray-700 dark:border-gray-600"
+            name="y" hx-get="/year/detail" hx-target="#sankey" hx-swap="outerHTML">
+      {{range .Years}}<option value="{{.}}" {{if eq . $.Year}}selected{{end}}>{{.}}</option>{{end}}
+    </select>
+  </div>
+  <div class="card bg-white dark:bg-gray-800 p-4">
+    {{template "sankey" .Sankey}}
+  </div>
+</div>
+{{end}}

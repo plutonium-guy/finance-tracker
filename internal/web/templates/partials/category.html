@@ -1,0 +1,11 @@
+{{define "category_list"}}
+<div class="flex flex-wrap gap-2">
+  {{range .Categories}}
+  <span class="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-sm">
+    {{.Name}}
+    <button class="text-blue-600" title="Rename" hx-post="/categories/{{.Name}}/rename" hx-prompt="New name for {{.Name}}" hx-target="#cat-list" hx-swap="innerHTML">✎</button>
+    {{if not .IsDefault}}<button class="text-red-600" title="Delete" hx-post="/categories/{{.Name}}/delete" hx-target="#cat-list" hx-swap="innerHTML" hx-confirm="Delete category {{.Name}}?">✕</button>{{end}}
+  </span>
+  {{end}}
+</div>
+{{end}}

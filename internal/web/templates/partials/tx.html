@@ -1,0 +1,92 @@
+{{define "sorth"}}{{.label}} <span class="inline-flex flex-col text-[9px] leading-none align-middle text-gray-400">
+  <button type="button" hx-get="/transactions/list?sort={{.key}}&order=asc" hx-include="#filters" hx-target="#tx-rows" hx-swap="innerHTML" title="Sort ascending">▲</button>
+  <button type="button" hx-get="/transactions/list?sort={{.key}}&order=desc" hx-include="#filters" hx-target="#tx-rows" hx-swap="innerHTML" title="Sort descending">▼</button>
+</span>{{end}}
+
+{{define "tx_table"}}
+{{- if .Txs}}
+  {{- range .Txs}}{{template "tx_row" .}}{{end}}
+{{- else}}
+  <tr id="tx-empty"><td colspan="9" class="text-center text-gray-500 py-10">
+    No transactions yet. <button class="text-blue-700 underline" hx-get="/transactions/new" hx-target="#modal" hx-swap="innerHTML">Add your first transaction</button>
+  </td></tr>
+{{- end}}
+{{end}}
+
+{{/* tx_created: insert a new row into #tx-rows via out-of-band swap so it works
+     from any page (transactions table or dashboard, where #tx-rows is absent and
+     the OOB simply no-ops). KPIs/charts refresh via the HX-Trigger header. */}}
+{{define "tx_created"}}<tbody hx-swap-oob="afterbegin:#tx-rows">{{template "tx_row" .}}</tbody>{{end}}
+
+{{define "tx_row"}}
+<tr id="tx-{{.ID}}" class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800">
+  <td class="px-3 py-2"><input type="checkbox" name="ids" value="{{.ID}}" class="tx-check"></td>
+  <td class="px-3 py-2 num whitespace-nowrap">{{formatDate .Date}}</td>
+  <td class="px-3 py-2">{{.Description}}{{if .Tags}}<div class="mt-0.5 flex flex-wrap gap-1">{{range .Tags}}<span class="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 text-xs dark:bg-gray-700 dark:text-blue-300">#{{.}}</span>{{end}}</div>{{end}}</td>
+  <td class="px-3 py-2 num text-right {{if eq (printf "%s" .Type) "Expense"}}text-red-600{{else if eq (printf "%s" .Type) "Income"}}text-green-600{{end}}">{{formatINR .Amount}}</td>
+  <td class="px-3 py-2 text-sm">{{.Type}}</td>
+  <td class="px-3 py-2 text-sm">{{.PaymentMethod}}</td>
+  <td class="px-3 py-2 text-sm">{{.Category}}</td>
+  <td class="px-3 py-2 text-sm text-gray-500">{{if .Notes}}{{.Notes}}{{end}}</td>
+  <td class="px-3 py-2 text-right whitespace-nowrap">
+    <button class="text-blue-700 text-sm" hx-get="/transactions/{{.ID}}/edit" hx-target="#modal" hx-swap="innerHTML" title="Edit">✎</button>
+    <button class="text-gray-600 text-sm" hx-post="/transactions/{{.ID}}/duplicate" hx-target="#tx-rows" hx-swap="afterbegin" title="Duplicate">⧉</button>
+    <button class="text-red-600 text-sm" hx-delete="/transactions/{{.ID}}" hx-target="#tx-{{.ID}}" hx-swap="outerHTML"
+            hx-confirm="Delete this transaction?" title="Delete">🗑</button>
+  </td>
+</tr>
+{{end}}
+
+{{define "tx_modal"}}
+{{- $tx := .Tx}}
+<form class="card bg-white dark:bg-gray-800 p-5"
+      {{if $tx}}hx-put="/transactions/{{$tx.ID}}" hx-target="#tx-{{$tx.ID}}" hx-swap="outerHTML"
+      {{else}}hx-post="/transactions" hx-swap="none"{{end}}>
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-lg font-semibold">{{if $tx}}Edit{{else}}Add{{end}} Transaction</h2>
+    <button type="button" class="text-gray-500" data-modal-close>✕</button>
+  </div>
+  {{if .Error}}<div class="text-red-600 text-sm mb-3">{{.Error}}</div>{{end}}
+  <div class="grid grid-cols-2 gap-3">
+    <label class="text-sm col-span-1">Date
+      <input type="date" name="date" required value="{{if $tx}}{{$tx.Date}}{{else}}{{.Today}}{{end}}"
+             class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">
+    </label>
+    <label class="text-sm col-span-1">Amount (₹)
+      <input type="number" step="0.01" min="0.01" name="amount" required value="{{if $tx}}{{rupees $tx.Amount}}{{end}}"
+             class="mt-1 w-full border rounded px-2 py-1.5 num dark:bg-gray-700 dark:border-gray-600">
+    </label>
+    <label class="text-sm col-span-2">Description
+      <input type="text" name="description" maxlength="200" required value="{{if $tx}}{{$tx.Description}}{{end}}"
+             class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">
+    </label>
+    <label class="text-sm">Type
+      <select name="type" class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">
+        {{range .Types}}<option {{if and $tx (eq (printf "%s" $tx.Type) (printf "%s" .))}}selected{{end}}>{{.}}</option>{{end}}
+      </select>
+    </label>
+    <label class="text-sm">Payment Method
+      <select name="payment_method" class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">
+        {{range .Methods}}<option {{if and $tx (eq (printf "%s" $tx.PaymentMethod) (printf "%s" .))}}selected{{end}}>{{.}}</option>{{end}}
+      </select>
+    </label>
+    <label class="text-sm col-span-2">Category
+      <select name="category" class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">
+        {{range .Categories}}<option {{if and $tx (eq $tx.Category .Name)}}selected{{end}}>{{.Name}}</option>{{end}}
+      </select>
+    </label>
+    <label class="text-sm col-span-2">Notes
+      <input type="text" name="notes" value="{{if and $tx $tx.Notes}}{{$tx.Notes}}{{end}}"
+             class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">
+    </label>
+    <label class="text-sm col-span-2">Tags <span class="text-gray-400">(comma-separated)</span>
+      <input type="text" name="tags" value="{{.TagList}}" placeholder="work, reimbursable"
+             class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">
+    </label>
+  </div>
+  <div class="mt-4 flex justify-end gap-2">
+    <button type="button" class="px-3 py-1.5 text-sm rounded border" data-modal-close>Cancel</button>
+    <button type="submit" class="px-4 py-1.5 text-sm rounded bg-blue-700 text-white">Save</button>
+  </div>
+</form>
+{{end}}

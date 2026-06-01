@@ -1,0 +1,12 @@
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex items-center justify-between flex-wrap gap-2">
+    <h1 class="text-xl font-bold">Monthly View</h1>
+    <select class="border rounded px-3 py-1.5 text-sm dark:bg-gray-700 dark:border-gray-600"
+            hx-get="/month/detail" hx-target="#month-detail" hx-swap="outerHTML" name="m">
+      {{range .Months}}<option value="{{.Key}}" {{if eq .Key $.Month}}selected{{end}}>{{.Label}}</option>{{end}}
+    </select>
+  </div>
+  {{template "month_detail" .}}
+</div>
+{{end}}

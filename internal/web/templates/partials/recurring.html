@@ -1,0 +1,70 @@
+{{define "recurring_table"}}
+{{- if .Rows}}
+  {{- range .Rows}}{{template "recurring_row" .}}{{end}}
+{{- else}}
+  <tr><td colspan="11" class="text-center text-gray-500 py-10">No recurring items yet.</td></tr>
+{{- end}}
+{{end}}
+
+{{define "recurring_row"}}
+{{- $it := .Item}}{{$c := .Calc}}
+<tr id="rec-{{$it.ID}}" class="border-b dark:border-gray-700">
+  <td class="px-3 py-2">{{$it.Name}}</td>
+  <td class="px-3 py-2 text-sm">{{$it.Category}}</td>
+  <td class="px-3 py-2 num text-right">{{formatINR $it.Amount}}</td>
+  <td class="px-3 py-2 text-sm">{{$it.Frequency}}</td>
+  <td class="px-3 py-2 text-sm">{{$it.Type}}</td>
+  <td class="px-3 py-2 num">{{formatDate $it.StartDate}}</td>
+  <td class="px-3 py-2 num text-right">{{formatINR $c.MonthlyEquivalent}}</td>
+  <td class="px-3 py-2 num text-right">{{formatINR $c.AnnualTotal}}</td>
+  <td class="px-3 py-2 num">{{if $c.NextDueDate}}{{formatDate $c.NextDueDate}}{{else}}—{{end}}</td>
+  <td class="px-3 py-2 text-center">
+    <button hx-post="/recurring/{{$it.ID}}/toggle" hx-target="#rec-{{$it.ID}}" hx-swap="outerHTML"
+      class="px-2 py-0.5 rounded text-xs {{if $it.Active}}bg-green-100 text-green-700{{else}}bg-gray-200 text-gray-600{{end}}">
+      {{if $it.Active}}Active{{else}}Paused{{end}}</button>
+  </td>
+  <td class="px-3 py-2 text-right whitespace-nowrap">
+    <button class="text-blue-700 text-sm" hx-get="/recurring/{{$it.ID}}/edit" hx-target="#modal" hx-swap="innerHTML">✎</button>
+    <button class="text-red-600 text-sm" hx-delete="/recurring/{{$it.ID}}" hx-target="#rec-{{$it.ID}}" hx-swap="outerHTML" hx-confirm="Delete?">🗑</button>
+  </td>
+</tr>
+{{end}}
+
+{{define "recurring_summary"}}
+{{- $s := .Summary}}
+<div id="recurring-summary" hx-get="/recurring/summary" hx-trigger="recChanged from:body" hx-swap="outerHTML"
+     class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+  <div class="card bg-white dark:bg-gray-800 p-4"><div class="text-xs uppercase text-gray-500">Monthly Expense</div><div class="num text-xl font-bold text-red-600">{{formatINR $s.MonthlyExpense}}</div></div>
+  <div class="card bg-white dark:bg-gray-800 p-4"><div class="text-xs uppercase text-gray-500">Annual Expense</div><div class="num text-xl font-bold text-red-600">{{formatINR $s.AnnualExpense}}</div></div>
+  <div class="card bg-white dark:bg-gray-800 p-4"><div class="text-xs uppercase text-gray-500">Monthly Income</div><div class="num text-xl font-bold text-green-600">{{formatINR $s.MonthlyIncome}}</div></div>
+  <div class="card bg-yellow-50 dark:bg-gray-800 p-4"><div class="text-xs uppercase text-gray-500">Free Cashflow</div><div class="num text-xl font-bold {{amountClass $s.FreeMonthlyCashflow}}">{{formatINR $s.FreeMonthlyCashflow}}</div></div>
+  <div class="card bg-white dark:bg-gray-800 p-4"><div class="text-xs uppercase text-gray-500">Commitment / Income</div><div class="num text-xl font-bold text-purple-600">{{pct $s.CommitmentRatio}}</div></div>
+</div>
+{{end}}
+
+{{define "recurring_modal"}}
+{{- $r := .Rec}}
+<form class="card bg-white dark:bg-gray-800 p-5"
+      {{if $r}}hx-put="/recurring/{{$r.ID}}"{{else}}hx-post="/recurring"{{end}}
+      hx-target="#rec-rows" hx-swap="afterbegin">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-lg font-semibold">{{if $r}}Edit{{else}}Add{{end}} Recurring Item</h2>
+    <button type="button" class="text-gray-500" data-modal-close>✕</button>
+  </div>
+  {{if .Error}}<div class="text-red-600 text-sm mb-3">{{.Error}}</div>{{end}}
+  <div class="grid grid-cols-2 gap-3">
+    <label class="text-sm col-span-2">Name<input name="name" required value="{{if $r}}{{$r.Name}}{{end}}" class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600"></label>
+    <label class="text-sm">Amount (₹)<input type="number" step="0.01" min="0.01" name="amount" required value="{{if $r}}{{rupees $r.Amount}}{{end}}" class="mt-1 w-full border rounded px-2 py-1.5 num dark:bg-gray-700 dark:border-gray-600"></label>
+    <label class="text-sm">Frequency<select name="frequency" class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">{{range .Frequencies}}<option {{if and $r (eq (printf "%s" $r.Frequency) (printf "%s" .))}}selected{{end}}>{{.}}</option>{{end}}</select></label>
+    <label class="text-sm">Type<select name="type" class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600"><option {{if and $r (eq (printf "%s" $r.Type) "Expense")}}selected{{end}}>Expense</option><option {{if and $r (eq (printf "%s" $r.Type) "Income")}}selected{{end}}>Income</option></select></label>
+    <label class="text-sm">Category<select name="category" class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">{{range .Categories}}<option {{if and $r (eq $r.Category .Name)}}selected{{end}}>{{.Name}}</option>{{end}}</select></label>
+    <label class="text-sm">Start Date<input type="date" name="start_date" required value="{{if $r}}{{$r.StartDate}}{{else}}{{.Today}}{{end}}" class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600"></label>
+    <label class="text-sm">End Date (optional)<input type="date" name="end_date" value="{{if and $r $r.EndDate}}{{$r.EndDate}}{{end}}" class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600"></label>
+    <label class="text-sm">Payment Method<select name="payment_method" class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">{{range .Methods}}<option {{if and $r (eq (printf "%s" $r.PaymentMethod) (printf "%s" .))}}selected{{end}}>{{.}}</option>{{end}}</select></label>
+  </div>
+  <div class="mt-4 flex justify-end gap-2">
+    <button type="button" class="px-3 py-1.5 text-sm rounded border" data-modal-close>Cancel</button>
+    <button type="submit" class="px-4 py-1.5 text-sm rounded bg-blue-700 text-white">Save</button>
+  </div>
+</form>
+{{end}}

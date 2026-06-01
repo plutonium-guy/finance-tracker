@@ -1,0 +1,35 @@
+{{define "month_detail"}}
+<div id="month-detail">
+  {{- $k := .KPIs}}
+  <div class="grid grid-cols-3 gap-3 mb-4">
+    <div class="card bg-white dark:bg-gray-800 p-4"><div class="text-xs uppercase text-gray-500">Credits</div><div class="num text-xl font-bold text-green-600">{{formatINR $k.MonthCredits}}</div></div>
+    <div class="card bg-white dark:bg-gray-800 p-4"><div class="text-xs uppercase text-gray-500">Debits</div><div class="num text-xl font-bold text-red-600">{{formatINR $k.MonthDebits}}</div></div>
+    <div class="card bg-yellow-50 dark:bg-gray-800 p-4"><div class="text-xs uppercase text-gray-500">Net Savings</div><div class="num text-xl font-bold {{amountClass $k.MonthNet}}">{{formatINR $k.MonthNet}}</div></div>
+  </div>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="card bg-white dark:bg-gray-800 p-4">
+      <h3 class="text-sm font-semibold mb-2">Where Money Went — {{formatMonth .Month}}</h3>
+      <script id="month-chart-data" type="application/json">{{.MonthChartJSON}}</script>
+      <div class="chart-box"><canvas id="chartMonthDoughnut"></canvas></div>
+    </div>
+    <div class="card bg-white dark:bg-gray-800 p-4">
+      <h3 class="text-sm font-semibold mb-2">Category Breakdown</h3>
+      <table class="w-full text-sm">
+        <thead><tr class="text-left text-gray-500"><th class="py-1">Category</th><th class="py-1 text-right">Spent</th><th class="py-1 text-right">% of month</th></tr></thead>
+        <tbody>
+          {{range .Categories}}<tr class="border-t dark:border-gray-700"><td class="py-1">{{.Category}}</td><td class="py-1 num text-right">{{formatINR .TotalSpent}}</td><td class="py-1 num text-right">{{pct .PctOfTotal}}</td></tr>{{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card bg-white dark:bg-gray-800 p-4 mt-4 overflow-x-auto">
+    <h3 class="text-sm font-semibold mb-2">Transactions — {{formatMonth .Month}}</h3>
+    <table class="w-full text-sm">
+      <thead><tr class="text-left text-gray-500 border-b dark:border-gray-700"><th class="px-2 py-1">Date</th><th class="px-2 py-1">Description</th><th class="px-2 py-1 text-right">Amount</th><th class="px-2 py-1">Type</th><th class="px-2 py-1">Category</th></tr></thead>
+      <tbody>
+        {{range .Txs}}<tr class="border-b dark:border-gray-700"><td class="px-2 py-1 num">{{formatDate .Date}}</td><td class="px-2 py-1">{{.Description}}</td><td class="px-2 py-1 num text-right">{{formatINR .Amount}}</td><td class="px-2 py-1">{{.Type}}</td><td class="px-2 py-1">{{.Category}}</td></tr>{{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

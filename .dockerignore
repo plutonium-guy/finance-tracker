@@ -1,0 +1,11 @@
+.git
+data/
+*.db
+telegram_offset
+tailwindcss
+finance-tracker
+.env
+._*
+.DS_Store
+CHECKLIST.md
+DEPLOY-RPI.md

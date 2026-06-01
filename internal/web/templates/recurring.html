@@ -1,0 +1,28 @@
+{{define "content"}}
+<div class="space-y-4">
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-bold">Recurring</h1>
+    <div class="flex gap-2">
+      <button class="px-3 py-1.5 text-sm rounded border" hx-post="/recurring/fire" hx-target="#flash" hx-swap="innerHTML"
+              hx-confirm="Post transactions for all recurring items due this month? (idempotent — already-posted items are skipped)">Post due ↻</button>
+      <button class="px-4 py-1.5 text-sm rounded bg-blue-700 text-white" hx-get="/recurring/new" hx-target="#modal" hx-swap="innerHTML">+ Add Recurring</button>
+    </div>
+  </div>
+
+  {{template "recurring_summary" .}}
+
+  <div class="card bg-white dark:bg-gray-800 overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="text-left text-gray-500 border-b dark:border-gray-700">
+        <tr>
+          <th class="px-3 py-2">Name</th><th class="px-3 py-2">Category</th><th class="px-3 py-2 text-right">Amount</th>
+          <th class="px-3 py-2">Freq</th><th class="px-3 py-2">Type</th><th class="px-3 py-2">Start</th>
+          <th class="px-3 py-2 text-right">Monthly Equiv</th><th class="px-3 py-2 text-right">Annual</th>
+          <th class="px-3 py-2">Next Due</th><th class="px-3 py-2 text-center">Active</th><th class="px-3 py-2"></th>
+        </tr>
+      </thead>
+      <tbody id="rec-rows">{{template "recurring_table" .}}</tbody>
+    </table>
+  </div>
+</div>
+{{end}}

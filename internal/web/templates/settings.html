@@ -1,0 +1,50 @@
+{{define "content"}}
+<div class="space-y-6 max-w-3xl">
+  <h1 class="text-xl font-bold">Settings</h1>
+
+  <form class="card bg-white dark:bg-gray-800 p-5 space-y-3" hx-post="/settings" hx-target="#flash" hx-swap="innerHTML">
+    <h2 class="font-semibold">Preferences</h2>
+    <div class="grid grid-cols-2 gap-3 text-sm">
+      <label>Currency<input value="{{.Settings.Currency}}" disabled class="mt-1 w-full border rounded px-2 py-1.5 bg-gray-100 dark:bg-gray-700"></label>
+      <label>Month Format<input value="{{.Settings.MonthFormat}}" disabled class="mt-1 w-full border rounded px-2 py-1.5 bg-gray-100 dark:bg-gray-700"></label>
+      <label>Date Format<input value="{{.Settings.DateFormat}}" disabled class="mt-1 w-full border rounded px-2 py-1.5 bg-gray-100 dark:bg-gray-700"></label>
+      <label>Fiscal Year Start
+        <select name="fiscal_year_start" class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">
+          <option {{if eq .Settings.FiscalYearStart "April"}}selected{{end}}>April</option>
+          <option {{if eq .Settings.FiscalYearStart "January"}}selected{{end}}>January</option>
+        </select>
+      </label>
+      <label class="flex items-center gap-2 mt-2"><input type="checkbox" name="dark_mode" {{if .Settings.DarkMode}}checked{{end}}> Dark mode</label>
+    </div>
+    <button class="px-4 py-1.5 text-sm rounded bg-blue-700 text-white">Save Preferences</button>
+  </form>
+
+  <div class="card bg-white dark:bg-gray-800 p-5 space-y-3">
+    <h2 class="font-semibold">Categories</h2>
+    <div id="cat-list">{{template "category_list" .}}</div>
+    <form class="flex gap-2" hx-post="/categories" hx-target="#cat-list" hx-swap="innerHTML">
+      <input name="name" placeholder="New category" required class="border rounded px-2 py-1.5 text-sm flex-1 dark:bg-gray-700 dark:border-gray-600">
+      <button class="px-3 py-1.5 text-sm rounded bg-blue-700 text-white">Add</button>
+    </form>
+  </div>
+
+  <div class="card bg-white dark:bg-gray-800 p-5 space-y-3">
+    <h2 class="font-semibold">Gmail Import</h2>
+    <p class="text-sm text-gray-500">Pull credit-card spend alerts from Gmail into transactions. Configure with the <code>GMAIL_*</code> env vars; it also runs automatically on a schedule.</p>
+    <button class="px-3 py-1.5 text-sm rounded border" hx-post="/gmail/sync" hx-target="#flash" hx-swap="innerHTML">Sync Gmail now</button>
+  </div>
+
+  <div class="card bg-white dark:bg-gray-800 p-5 space-y-3">
+    <h2 class="font-semibold">Backup &amp; Restore</h2>
+    <div class="flex flex-wrap gap-2">
+      <a class="px-3 py-1.5 text-sm rounded border" href="/backup">Export JSON</a>
+      <form hx-post="/restore" hx-encoding="multipart/form-data" hx-target="#flash" hx-swap="innerHTML" class="flex gap-2 items-center">
+        <input type="file" name="file" accept="application/json" required class="text-sm">
+        <button class="px-3 py-1.5 text-sm rounded border">Restore</button>
+      </form>
+      <button class="px-3 py-1.5 text-sm rounded border border-red-300 text-red-700"
+              hx-post="/reset" hx-target="#flash" hx-swap="innerHTML" hx-confirm="Wipe all data and re-seed defaults?">Reset</button>
+    </div>
+  </div>
+</div>
+{{end}}
