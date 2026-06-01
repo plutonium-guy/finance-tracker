@@ -141,6 +141,18 @@ func (h *Handler) Routes(static http.Handler) http.Handler {
 	r.Post("/budgets", h.BudgetSet)
 	r.Post("/budgets/{category}/delete", h.BudgetDelete)
 
+	// Credit cards + billing cycles.
+	r.Route("/cards", func(r chi.Router) {
+		r.Get("/", h.CardsPage)
+		r.Get("/list", h.CardsList)
+		r.Get("/new", h.CardNew)
+		r.Post("/", h.CardCreate)
+		r.Get("/{id}/edit", h.CardEdit)
+		r.Put("/{id}", h.CardUpdate)
+		r.Delete("/{id}", h.CardDelete)
+		r.Post("/{id}/pay", h.CardPay)
+	})
+
 	// Year-end sankey.
 	r.Get("/year", h.YearPage)
 	r.Get("/year/detail", h.YearDetail)

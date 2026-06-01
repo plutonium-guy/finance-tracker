@@ -22,6 +22,8 @@ type DB interface {
 	WasGmailProcessed(messageID string) (bool, error)
 	MarkGmailProcessed(messageID, txID, processedAt string) error
 	CreateTransaction(t domain.Transaction) error
+	CardIDByLast4(last4 string) (string, bool, error)
+	SetTransactionCard(txID, cardID string) error
 }
 
 // Config tunes the sync.
@@ -115,6 +117,14 @@ func (s *Syncer) Run(ctx context.Context) (Result, error) {
 		if err := s.db.CreateTransaction(t); err != nil {
 			res.Skipped++
 			continue // leave unmarked so a later run can retry
+		}
+		// Link the spend to a known card when the alert stated a last-4.
+		if parsed.Last4 != "" {
+			if cardID, ok, _ := s.db.CardIDByLast4(parsed.Last4); ok {
+				if err := s.db.SetTransactionCard(t.ID, cardID); err != nil {
+					slog.Error("gmail: link transaction to card", "tx", t.ID, "last4", parsed.Last4, "err", err)
+				}
+			}
 		}
 		if err := s.db.MarkGmailProcessed(m.ID, t.ID, nowISO); err != nil {
 			// Transaction is already saved; if we fail to record it as

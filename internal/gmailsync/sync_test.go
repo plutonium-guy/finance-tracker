@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"finance-tracker/internal/domain"
 	"finance-tracker/internal/store"
 )
 
@@ -82,6 +83,47 @@ func TestSyncerImportsAndDedupes(t *testing.T) {
 	rows2, _ := db.AllTransactions()
 	if len(rows2) != 2 {
 		t.Errorf("idempotent run added rows: now %d", len(rows2))
+	}
+}
+
+func TestExtractLast4(t *testing.T) {
+	cases := map[string]string{
+		"Your ICICI Bank Credit Card XX4003 has been used":     "4003",
+		"HDFC Bank Credit Card xx1234 at AMAZON":               "1234",
+		"card ending in 9012 was charged":                      "9012",
+		"card ending 7782 spent":                               "7782",
+		"₹450 was charged at UBER on your card":                "", // no number stated
+	}
+	for text, want := range cases {
+		if got := extractLast4(text); got != want {
+			t.Errorf("extractLast4(%q) = %q, want %q", text, got, want)
+		}
+	}
+}
+
+// TestSyncerLinksCardByLast4 verifies an imported spend is linked to the card
+// whose last-4 matches the alert.
+func TestSyncerLinksCardByLast4(t *testing.T) {
+	db := newDB(t)
+	if err := db.CreateCard(domain.Card{ID: "card-icici", Name: "ICICI", Last4: "4003", StatementDay: 18, DueOffsetDays: 18, CreatedAt: "2026-01-01T00:00:00Z", UpdatedAt: "2026-01-01T00:00:00Z"}); err != nil {
+		t.Fatal(err)
+	}
+	d := time.Date(2026, 6, 1, 9, 0, 0, 0, time.UTC)
+	msg := Message{ID: "<x@icici>", From: "credit_cards@icicibank.com",
+		Subject: "Transaction alert for your ICICI Bank Credit Card", Date: d,
+		Text: "Your ICICI Bank Credit Card XX4003 has been used for a transaction of INR 80.00 on Jun 01, 2026 at 09:00:24. Info: UPI-651816620443-Mr Aasi."}
+	s := NewSyncer(fakeFetcher{[]Message{msg}}, db, Config{Senders: DefaultCardSenders},
+		func() time.Time { return time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC) })
+	if _, err := s.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	rows, _ := db.AllTransactions()
+	if len(rows) != 1 {
+		t.Fatalf("got %d transactions, want 1", len(rows))
+	}
+	cardID, _ := db.CardOfTransaction(rows[0].ID)
+	if cardID != "card-icici" {
+		t.Errorf("linked card = %q, want %q", cardID, "card-icici")
 	}
 }
 

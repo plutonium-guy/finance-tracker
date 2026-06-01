@@ -41,9 +41,30 @@ type txModalVM struct {
 	Categories []domain.Category
 	Methods    []domain.PaymentMethod
 	Types      []domain.TransactionType
+	Cards      []domain.Card
+	CardID     string // currently linked card (for edit)
 	Today      string
 	TagList    string // comma-separated existing tags (for edit)
 	Error      string
+}
+
+// txModalBase builds the modal VM fields shared by new/edit/error renders.
+func (h *Handler) txModalBase() txModalVM {
+	cats, _ := h.svc.Store.ListCategories()
+	cards, _ := h.svc.Store.ListCards()
+	return txModalVM{
+		Categories: cats, Methods: methods(), Types: types(), Cards: cards,
+		Today: h.svc.Now().Format("2006-01-02"),
+	}
+}
+
+// cardIDForForm returns the card to link a transaction to: the posted card_id
+// when the method is Credit Card, else "" (which clears any existing link).
+func (h *Handler) cardIDForForm(r *http.Request, t domain.Transaction) string {
+	if t.PaymentMethod != domain.CreditCard {
+		return ""
+	}
+	return strings.TrimSpace(r.FormValue("card_id"))
 }
 
 // decorate attaches each transaction's tags for rendering.
@@ -145,11 +166,7 @@ func (h *Handler) filterByTag(r *http.Request, txs []domain.Transaction, total i
 }
 
 func (h *Handler) TransactionNew(w http.ResponseWriter, r *http.Request) {
-	cats, _ := h.svc.Store.ListCategories()
-	h.rdr.Fragment(w, "tx_modal", txModalVM{
-		Categories: cats, Methods: methods(), Types: types(),
-		Today: h.svc.Now().Format("2006-01-02"),
-	})
+	h.rdr.Fragment(w, "tx_modal", h.txModalBase())
 }
 
 func (h *Handler) TransactionEdit(w http.ResponseWriter, r *http.Request) {
@@ -158,12 +175,11 @@ func (h *Handler) TransactionEdit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", 404)
 		return
 	}
-	cats, _ := h.svc.Store.ListCategories()
 	tags, _ := h.svc.Store.TagsFor(t.ID)
-	h.rdr.Fragment(w, "tx_modal", txModalVM{
-		Tx: &t, Categories: cats, Methods: methods(), Types: types(),
-		Today: h.svc.Now().Format("2006-01-02"), TagList: strings.Join(tags, ", "),
-	})
+	cardID, _ := h.svc.Store.CardOfTransaction(t.ID)
+	vm := h.txModalBase()
+	vm.Tx, vm.TagList, vm.CardID = &t, strings.Join(tags, ", "), cardID
+	h.rdr.Fragment(w, "tx_modal", vm)
 }
 
 func (h *Handler) modalError(w http.ResponseWriter, name string, vm any) {
@@ -176,19 +192,22 @@ func (h *Handler) modalError(w http.ResponseWriter, name string, vm any) {
 func (h *Handler) TransactionCreate(w http.ResponseWriter, r *http.Request) {
 	t, err := h.parseTxForm(r, domain.Transaction{})
 	if err != nil {
-		cats, _ := h.svc.Store.ListCategories()
-		h.modalError(w, "tx_modal", txModalVM{Tx: nil, Categories: cats, Methods: methods(), Types: types(), Today: h.svc.Now().Format("2006-01-02"), Error: err.Error()})
+		vm := h.txModalBase()
+		vm.Error = err.Error()
+		h.modalError(w, "tx_modal", vm)
 		return
 	}
 	now := h.svc.Now().UTC().Format(time.RFC3339)
 	t.ID = uuid.NewString()
 	t.CreatedAt, t.UpdatedAt = now, now
 	if err := h.svc.Store.CreateTransaction(t); err != nil {
-		cats, _ := h.svc.Store.ListCategories()
-		h.modalError(w, "tx_modal", txModalVM{Categories: cats, Methods: methods(), Types: types(), Today: h.svc.Now().Format("2006-01-02"), Error: friendly(err)})
+		vm := h.txModalBase()
+		vm.Error = friendly(err)
+		h.modalError(w, "tx_modal", vm)
 		return
 	}
 	h.svc.Store.SetTransactionTags(t.ID, parseTags(r.FormValue("tags")))
+	h.svc.Store.SetTransactionCard(t.ID, h.cardIDForForm(r, t))
 	txTrigger(w)
 	// OOB insert into #tx-rows (no-ops on pages without the table).
 	h.rdr.Fragment(w, "tx_created", h.one(t))
@@ -202,8 +221,9 @@ func (h *Handler) TransactionUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	t, err := h.parseTxForm(r, existing)
 	if err != nil {
-		cats, _ := h.svc.Store.ListCategories()
-		h.modalError(w, "tx_modal", txModalVM{Tx: &existing, Categories: cats, Methods: methods(), Types: types(), Today: h.svc.Now().Format("2006-01-02"), Error: err.Error()})
+		vm := h.txModalBase()
+		vm.Tx, vm.Error = &existing, err.Error()
+		h.modalError(w, "tx_modal", vm)
 		return
 	}
 	t.UpdatedAt = h.svc.Now().UTC().Format(time.RFC3339)
@@ -212,6 +232,7 @@ func (h *Handler) TransactionUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.svc.Store.SetTransactionTags(t.ID, parseTags(r.FormValue("tags")))
+	h.svc.Store.SetTransactionCard(t.ID, h.cardIDForForm(r, t))
 	txTrigger(w)
 	h.rdr.Fragment(w, "tx_row", h.one(t))
 }

@@ -26,6 +26,7 @@ type Message struct {
 type Parsed struct {
 	Amount   float64
 	Merchant string
+	Last4    string // card's last 4 digits, when the alert states them
 }
 
 var (
@@ -45,6 +46,8 @@ var (
 	excludeRe = regexp.MustCompile(`(?i)\b(credited to|statement|e-?statement|reward points|refund|revers(?:ed|al)|payment received|payment of .* received|total amount due|minimum (?:amount )?due|\botp\b|one[ -]time password|due date|declined|failed)\b`)
 	// a bare time like 09:00 or 09:00:24 (so "at 09:00:24" isn't read as a merchant)
 	timeRe = regexp.MustCompile(`^\d{1,2}:\d{2}(?::\d{2})?$`)
+	// card last-4: a masked "XX4003"/"XXXX4003" or "ending [in] 4003".
+	last4Re = regexp.MustCompile(`(?i)(?:x{2,}\s?|ending(?:\s+in)?\s+)(\d{4})\b`)
 )
 
 // ParseCardEmail extracts a spend from an email's subject + body. The second
@@ -62,7 +65,15 @@ func ParseCardEmail(subject, body string) (Parsed, bool) {
 	if err != nil || amt <= 0 {
 		return Parsed{}, false
 	}
-	return Parsed{Amount: amt, Merchant: extractMerchant(text)}, true
+	return Parsed{Amount: amt, Merchant: extractMerchant(text), Last4: extractLast4(text)}, true
+}
+
+// extractLast4 finds the card's last 4 digits from a masked or "ending" pattern.
+func extractLast4(text string) string {
+	if m := last4Re.FindStringSubmatch(text); m != nil {
+		return m[1]
+	}
+	return ""
 }
 
 // excludeOnlyContext reports whether the message is a non-spend (payment,
