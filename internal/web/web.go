@@ -88,6 +88,7 @@ func (h *Handler) Routes(static http.Handler) http.Handler {
 
 	r.Get("/healthz", h.Health)
 	r.Post("/api/push", h.Push)
+	r.Post("/api/transactions", h.TransactionCreateAPI)
 	r.Post("/api/gmail/sync", h.GmailSyncAPI)
 	r.Post("/gmail/sync", h.GmailSyncUI)
 	r.Get("/", h.Dashboard)

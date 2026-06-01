@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -15,6 +16,125 @@ import (
 	"finance-tracker/internal/domain"
 	"finance-tracker/internal/store"
 )
+
+// txAPIRequest is the JSON body accepted by POST /api/transactions. amount is in
+// rupees. Empty optional fields fall back to sensible defaults.
+type txAPIRequest struct {
+	Date          string   `json:"date"`           // YYYY-MM-DD; default today
+	Amount        float64  `json:"amount"`         // rupees; required, > 0
+	Description   string   `json:"description"`    // required
+	Type          string   `json:"type"`           // default Expense
+	PaymentMethod string   `json:"payment_method"` // default UPI
+	Category      string   `json:"category"`       // default Miscellaneous
+	Notes         string   `json:"notes"`
+	Tags          []string `json:"tags"`
+	CardID        string   `json:"card_id"`
+}
+
+// txAPIResponse is the JSON returned for a created transaction.
+type txAPIResponse struct {
+	ID            string   `json:"id"`
+	Date          string   `json:"date"`
+	Amount        float64  `json:"amount"` // rupees
+	AmountPaise   int64    `json:"amount_paise"`
+	Description   string   `json:"description"`
+	Type          string   `json:"type"`
+	PaymentMethod string   `json:"payment_method"`
+	Category      string   `json:"category"`
+	Notes         string   `json:"notes,omitempty"`
+	Tags          []string `json:"tags,omitempty"`
+	CardID        string   `json:"card_id,omitempty"`
+}
+
+// TransactionCreateAPI creates a transaction from a JSON body. Token-protected,
+// for scripts/cron:
+//
+//	curl -X POST http://host:8080/api/transactions \
+//	  -H 'Authorization: Bearer $API_PUSH_TOKEN' \
+//	  -H 'Content-Type: application/json' \
+//	  -d '{"amount":250,"description":"Coffee","category":"Miscellaneous"}'
+func (h *Handler) TransactionCreateAPI(w http.ResponseWriter, r *http.Request) {
+	if h.apiToken == "" {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "api not configured (set API_PUSH_TOKEN)"})
+		return
+	}
+	if !h.apiAuthorized(r) {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
+		return
+	}
+
+	var req txAPIRequest
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid JSON body"})
+		return
+	}
+
+	// Defaults for omitted fields.
+	t := domain.Transaction{
+		Date:          strings.TrimSpace(req.Date),
+		Description:   strings.TrimSpace(req.Description),
+		Type:          domain.TransactionType(strDefault(req.Type, string(domain.Expense))),
+		PaymentMethod: domain.PaymentMethod(strDefault(req.PaymentMethod, string(domain.UPI))),
+		Category:      strDefault(strings.TrimSpace(req.Category), h.defaultCategory()),
+	}
+	if t.Date == "" {
+		t.Date = h.svc.Now().Format("2006-01-02")
+	}
+	if n := strings.TrimSpace(req.Notes); n != "" {
+		t.Notes = &n
+	}
+
+	// Validate (mirrors the web form rules).
+	if req.Amount <= 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "amount must be a positive number (rupees)"})
+		return
+	}
+	t.Amount = domain.ToPaise(req.Amount)
+	if t.Description == "" || len(t.Description) > 200 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "description is required (≤200 chars)"})
+		return
+	}
+	if !domain.IsValidType(t.Type) {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid type (Income|Expense|Transfer)"})
+		return
+	}
+	if !domain.IsValidPaymentMethod(t.PaymentMethod) {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid payment_method"})
+		return
+	}
+	if _, err := time.Parse("2006-01-02", t.Date); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid date (want YYYY-MM-DD)"})
+		return
+	}
+
+	now := h.svc.Now().UTC().Format(time.RFC3339)
+	t.ID = uuid.NewString()
+	t.CreatedAt, t.UpdatedAt = now, now
+	if err := h.svc.Store.CreateTransaction(t); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": friendly(err)})
+		return
+	}
+	tags := req.Tags
+	h.svc.Store.SetTransactionTags(t.ID, tags)
+	cardID := ""
+	if t.PaymentMethod == domain.CreditCard {
+		cardID = strings.TrimSpace(req.CardID)
+		h.svc.Store.SetTransactionCard(t.ID, cardID)
+	}
+
+	writeJSON(w, http.StatusCreated, txAPIResponse{
+		ID: t.ID, Date: t.Date, Amount: req.Amount, AmountPaise: int64(t.Amount),
+		Description: t.Description, Type: string(t.Type), PaymentMethod: string(t.PaymentMethod),
+		Category: t.Category, Notes: req.Notes, Tags: tags, CardID: cardID,
+	})
+}
+
+func strDefault(v, def string) string {
+	if strings.TrimSpace(v) == "" {
+		return def
+	}
+	return v
+}
 
 // txRow is a transaction decorated with its tags for table rendering.
 type txRow struct {

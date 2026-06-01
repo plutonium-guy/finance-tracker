@@ -1,12 +1,87 @@
 package web
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"finance-tracker/internal/domain"
+	"finance-tracker/internal/service"
+	"finance-tracker/internal/store"
 )
+
+// newTestServerWithToken builds a server like newTestServer but with the API
+// bearer token configured, so the /api/* endpoints are active.
+func newTestServerWithToken(t *testing.T, token string) (http.Handler, *store.SQLite) {
+	t.Helper()
+	db, err := store.OpenSQLite(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	for _, fn := range []func() error{db.Migrate, db.EnsureSettings, db.SeedDefaultCategories} {
+		if err := fn(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	svc := service.New(db, func() time.Time { return time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC) })
+	rdr, err := NewRenderer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := NewHandler(svc, rdr)
+	h.SetAPIToken(token)
+	return h.Routes(http.FileServer(http.FS(StaticFS()))), db
+}
+
+func postJSON(t *testing.T, h http.Handler, path, token, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest("POST", path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestTransactionCreateAPIWithToken(t *testing.T) {
+	h, db := newTestServerWithToken(t, "secret")
+
+	// No token configured at all is covered by the router default; here a token
+	// IS set, so a wrong token → 401.
+	if rec := postJSON(t, h, "/api/transactions", "nope", `{"amount":250,"description":"x"}`); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("bad token: status %d, want 401", rec.Code)
+	}
+	// Bad amount → 400.
+	if rec := postJSON(t, h, "/api/transactions", "secret", `{"amount":0,"description":"x"}`); rec.Code != http.StatusBadRequest {
+		t.Fatalf("zero amount: status %d, want 400", rec.Code)
+	}
+	// Valid create → 201, applies defaults (Expense/UPI/today), returns id.
+	rec := postJSON(t, h, "/api/transactions", "secret", `{"amount":250.5,"description":"Coffee","tags":["work"]}`)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create: status %d body %s", rec.Code, rec.Body.String())
+	}
+	var resp txAPIResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.ID == "" || resp.AmountPaise != 25050 || resp.Type != "Expense" || resp.PaymentMethod != "UPI" {
+		t.Fatalf("unexpected response: %+v", resp)
+	}
+	rows, _ := db.AllTransactions()
+	if len(rows) != 1 || rows[0].Description != "Coffee" {
+		t.Fatalf("transaction not stored: %+v", rows)
+	}
+	if tags, _ := db.TagsFor(resp.ID); len(tags) != 1 || tags[0] != "work" {
+		t.Errorf("tags = %v, want [work]", tags)
+	}
+}
 
 func TestCardsPageAndMarkPaid(t *testing.T) {
 	h, db := newTestServer(t)
