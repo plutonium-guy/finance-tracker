@@ -208,10 +208,11 @@ func (b *Bot) Run(ctx context.Context, client *Client) {
 			b.HandleMessage(ctx, u.Message)
 			if u.UpdateID >= offset {
 				offset = u.UpdateID + 1
+				// Persist after each handled update, not once per batch, so a
+				// crash reprocesses at most the single in-flight message rather
+				// than re-adding every transaction in the batch.
+				b.saveOffset(offset)
 			}
-		}
-		if len(updates) > 0 {
-			b.saveOffset(offset)
 		}
 	}
 }
@@ -224,7 +225,13 @@ func (b *Bot) loadOffset() int64 {
 	if err != nil {
 		return 0
 	}
-	n, _ := strconv.ParseInt(strings.TrimSpace(string(data)), 10, 64)
+	n, err := strconv.ParseInt(strings.TrimSpace(string(data)), 10, 64)
+	if err != nil {
+		// Don't silently fall back to 0 — that would reprocess every pending
+		// update and create duplicate transactions. Surface it instead.
+		slog.Error("telegram: corrupt offset file, resuming from 0 (may reprocess)", "path", b.offsetPath, "err", err)
+		return 0
+	}
 	return n
 }
 

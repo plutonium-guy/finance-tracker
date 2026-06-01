@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -40,6 +41,9 @@ var funcMap = template.FuncMap{
 	"title":       func(s string) string { return s },
 	"dict":        dict,
 	"upper":       strings.ToUpper,
+	// pathEscape makes a value safe to embed in a URL path segment (e.g. a
+	// category name with spaces, '&', '#', '?').
+	"pathEscape": url.PathEscape,
 }
 
 // flowPalette colors the sankey/flow segments deterministically by index.

@@ -84,3 +84,45 @@ func TestSyncerImportsAndDedupes(t *testing.T) {
 		t.Errorf("idempotent run added rows: now %d", len(rows2))
 	}
 }
+
+// TestSyncerImportsRealICICIEmail drives the exact ICICI credit-card alert the
+// daily cron will see through the whole pipeline and asserts the resulting DB row.
+func TestSyncerImportsRealICICIEmail(t *testing.T) {
+	db := newDB(t)
+	d := time.Date(2026, 6, 1, 9, 0, 24, 0, time.UTC)
+	msg := Message{
+		ID:      "<icici-4003-20260601@icicibank.com>",
+		From:    "credit_cards@icicibank.com",
+		Subject: "Transaction alert for your ICICI Bank Credit Card",
+		Date:    d,
+		Text: "Dear Customer,\n\nYour ICICI Bank Credit Card XX4003 has been used for a transaction of INR 80.00 on Jun 01, 2026 at 09:00:24. Info: UPI-651816620443-Mr Aasi.\n\n" +
+			"The Available Credit Limit on your card is INR 10,29,889.00 and Total Credit Limit is INR 10,30,000.00. The above limits are a total of the limits of all the Credit Cards issued to the primary card holder, including any supplementary cards.",
+	}
+	clock := func() time.Time { return time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC) }
+	s := NewSyncer(fakeFetcher{[]Message{msg}}, db, Config{Senders: DefaultCardSenders}, clock)
+
+	res, err := s.Run(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Imported != 1 {
+		t.Fatalf("imported %d, want 1 (res=%+v)", res.Imported, res)
+	}
+	rows, _ := db.AllTransactions()
+	if len(rows) != 1 {
+		t.Fatalf("got %d transactions, want 1", len(rows))
+	}
+	tx := rows[0]
+	if tx.Amount.FormatINR() != "₹80.00" {
+		t.Errorf("amount = %s, want ₹80.00 (must not pick up the limit amounts)", tx.Amount.FormatINR())
+	}
+	if tx.Description != "Mr Aasi" {
+		t.Errorf("description = %q, want %q", tx.Description, "Mr Aasi")
+	}
+	if string(tx.Type) != "Expense" || string(tx.PaymentMethod) != "Credit Card" {
+		t.Errorf("wrong type/method: %s / %s", tx.Type, tx.PaymentMethod)
+	}
+	if tx.Date != "2026-06-01" {
+		t.Errorf("date = %s, want 2026-06-01", tx.Date)
+	}
+}

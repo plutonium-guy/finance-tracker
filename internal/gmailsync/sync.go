@@ -2,7 +2,9 @@ package gmailsync
 
 import (
 	"context"
+	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -36,6 +38,9 @@ type Syncer struct {
 	db      DB
 	cfg     Config
 	now     func() time.Time
+	mu      sync.Mutex // serializes Run so the scheduled ticker and a manual
+	// /api/gmail/sync trigger can't process the same email concurrently and
+	// double-insert it.
 }
 
 // Result summarizes a sync run.
@@ -65,6 +70,8 @@ func NewSyncer(fetcher Fetcher, db DB, cfg Config, now func() time.Time) *Syncer
 // Run fetches, parses, dedupes, and inserts. Each email is marked processed
 // exactly once (spend or not) so subsequent runs skip it.
 func (s *Syncer) Run(ctx context.Context) (Result, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	since := s.now().AddDate(0, 0, -s.cfg.LookbackDays)
 	msgs, err := s.fetcher.Fetch(ctx, s.cfg.Senders, since)
 	if err != nil {
@@ -85,7 +92,9 @@ func (s *Syncer) Run(ctx context.Context) (Result, error) {
 		nowISO := s.now().UTC().Format(time.RFC3339)
 		if !ok {
 			// Remember it so we don't reparse the same non-spend every run.
-			s.db.MarkGmailProcessed(m.ID, "", nowISO)
+			if err := s.db.MarkGmailProcessed(m.ID, "", nowISO); err != nil {
+				slog.Error("gmail: mark non-spend processed", "id", m.ID, "err", err)
+			}
 			res.Skipped++
 			continue
 		}
@@ -107,7 +116,11 @@ func (s *Syncer) Run(ctx context.Context) (Result, error) {
 			res.Skipped++
 			continue // leave unmarked so a later run can retry
 		}
-		s.db.MarkGmailProcessed(m.ID, t.ID, nowISO)
+		if err := s.db.MarkGmailProcessed(m.ID, t.ID, nowISO); err != nil {
+			// Transaction is already saved; if we fail to record it as
+			// processed, a later run could re-import it. Surface it loudly.
+			slog.Error("gmail: imported but failed to mark processed (may re-import)", "id", m.ID, "tx", t.ID, "err", err)
+		}
 		res.Imported++
 	}
 	return res, nil
