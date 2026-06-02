@@ -49,6 +49,26 @@ one file to a server (or a Raspberry Pi) and run it.
   action; shows the monthly amount needed to hit the deadline.
 - **Budgets** — per-category monthly limits with an overspend warning.
 
+### Accounts & net worth
+- Define bank/cash/wallet accounts with opening balances; optionally link each
+  transaction to an account to track its running balance.
+- **Net worth** = account balances + investment value − credit-card outstanding.
+
+### Investment portfolio
+- Track holdings (mutual funds, stocks, ETFs, gold, …) with units and average
+  cost; per-holding value / P&L / return and an asset-type allocation view.
+- **Auto NAV**: mutual funds with an AMFI scheme code refresh from AMFI's daily
+  file (free, no key) on a schedule or via the "Sync NAVs" button.
+
+### Cashflow forecast & proactive alerts
+- Dashboard **forecast** projects month-end net from actual + still-due recurring.
+- **Alerts** (over-budget, card due/overdue, recurring due) via Telegram, on a
+  schedule (`ALERTS_INTERVAL`) or `POST /api/alerts/run`.
+
+### Reimbursements
+- Tag an expense `reimbursable`; the **Reimbursements** page tracks the
+  outstanding total and lets you mark items settled.
+
 ### Credit cards & billing cycles
 - Define multiple cards (name, last-4, credit limit, statement day, due-offset days).
 - Per-card view: current cycle's accrued spend, the last closed statement amount and
@@ -95,6 +115,9 @@ Set these in the environment or a `.env` file next to the binary.
 | `DB_PATH` | `./finance.db` | SQLite file location |
 | `SEED_DEMO` | `false` | `true` loads demo data on first run (only when DB is empty) |
 | `API_PUSH_TOKEN` | — | Bearer token gating the `/api/*` endpoints |
+| `RECURRING_AUTOFIRE` | `false` | `true` posts the month's due recurring items on startup |
+| `ALERTS_INTERVAL` | — | e.g. `24h` — schedule proactive Telegram alerts (needs the bot) |
+| `NAV_SYNC_INTERVAL` | `12h` | how often to refresh mutual-fund NAVs from AMFI |
 | `TELEGRAM_BOT_TOKEN` | — | Enables the Telegram bot (from @BotFather) |
 | `TELEGRAM_ALLOWED_CHAT` | — | Restrict adds to one chat id; also the default push target |
 | `GMAIL_IMAP_USER` | — | Gmail address (enables Gmail import) |
@@ -175,6 +198,10 @@ scripts/add-transaction.sh -h     # full usage
 
 The UI's form route `POST /transactions` (form-encoded, **not** token-protected, returns
 an HTML fragment) also exists for the browser; prefer the JSON API above for scripting.
+
+### Other token-protected endpoints
+- `POST /api/alerts/run` → run the alert check (sends a Telegram message if any).
+- `POST /api/nav/sync` → refresh mutual-fund NAVs from AMFI.
 
 ### Health check
 `GET /healthz` → `200 {"status":"ok"}` when the database is reachable.
