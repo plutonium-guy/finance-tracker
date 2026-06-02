@@ -90,12 +90,14 @@ func (h *Handler) Routes(static http.Handler) http.Handler {
 	r.Post("/api/push", h.Push)
 	r.Post("/api/transactions", h.TransactionCreateAPI)
 	r.Post("/api/gmail/sync", h.GmailSyncAPI)
+	r.Post("/api/alerts/run", h.AlertsRun)
 	r.Post("/gmail/sync", h.GmailSyncUI)
 	r.Get("/", h.Dashboard)
 	r.Get("/partials/kpis", h.PartialKPIs)
 	r.Get("/partials/paycycle", h.PartialPayCycle)
 	r.Get("/partials/charts", h.PartialCharts)
 	r.Get("/partials/recent", h.PartialRecent)
+	r.Get("/partials/forecast", h.PartialForecast)
 
 	r.Route("/transactions", func(r chi.Router) {
 		r.Get("/", h.TransactionsPage)

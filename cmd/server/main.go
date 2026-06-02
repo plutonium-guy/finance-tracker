@@ -75,6 +75,15 @@ func main() {
 		slog.Info("demo data seeded (SEED_DEMO=true)")
 	}
 
+	// Optionally post this month's due recurring items on startup.
+	if os.Getenv("RECURRING_AUTOFIRE") == "true" {
+		if n, err := svc.PostDue(svc.CurrentMonth()); err != nil {
+			slog.Error("recurring auto-fire", "err", err)
+		} else if n > 0 {
+			slog.Info("recurring auto-fire", "posted", n, "month", svc.CurrentMonth())
+		}
+	}
+
 	// Optional Telegram bot: add transactions by messaging the bot.
 	botCtx, stopBot := context.WithCancel(context.Background())
 	defer stopBot()
@@ -105,6 +114,9 @@ func main() {
 
 	// Gmail credit-card import (scheduled + POST /gmail/sync, /api/gmail/sync).
 	startGmailSync(botCtx, svc, h)
+
+	// Optional scheduled proactive alerts (budgets, card dues, recurring) via Telegram.
+	startAlerts(botCtx, h, botClient != nil)
 
 	handler := h.Routes(http.FileServer(http.FS(web.StaticFS())))
 
@@ -258,6 +270,42 @@ func startGmailSync(ctx context.Context, svc *service.Service, h *web.Handler) {
 				return
 			case <-ticker.C:
 				run()
+			}
+		}
+	}()
+}
+
+// startAlerts schedules proactive Telegram alerts when ALERTS_INTERVAL is set
+// and the bot is available. The /api/alerts/run endpoint works regardless (for cron).
+func startAlerts(ctx context.Context, h *web.Handler, botEnabled bool) {
+	v := os.Getenv("ALERTS_INTERVAL")
+	if v == "" {
+		return
+	}
+	interval, err := time.ParseDuration(v)
+	if err != nil || interval <= 0 {
+		slog.Warn("alerts: invalid ALERTS_INTERVAL, scheduler disabled", "value", v)
+		return
+	}
+	if !botEnabled {
+		slog.Info("alerts: ALERTS_INTERVAL set but Telegram bot disabled; use POST /api/alerts/run instead")
+		return
+	}
+	slog.Info("scheduled alerts enabled", "interval", interval.String())
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				alerts, sent, err := h.RunAlerts(ctx)
+				if err != nil {
+					slog.Error("alerts run", "err", err)
+					continue
+				}
+				slog.Info("alerts run", "count", len(alerts), "sent", sent)
 			}
 		}
 	}()

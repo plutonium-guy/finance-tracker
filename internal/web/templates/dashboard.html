@@ -8,6 +8,7 @@
 
   <section><h2 class="text-sm font-semibold text-gray-500 mb-2">Overview</h2>{{template "kpi_strip" .}}</section>
   <section><h2 class="text-sm font-semibold text-gray-500 mb-2">Pay Cycle</h2>{{template "paycycle_strip" .}}</section>
+  <section><h2 class="text-sm font-semibold text-gray-500 mb-2">Cashflow Forecast</h2>{{template "forecast" .}}</section>
   {{if .Goals}}<section><h2 class="text-sm font-semibold text-gray-500 mb-2">Goals</h2>{{template "goals_list" .}}</section>{{end}}
   <section><h2 class="text-sm font-semibold text-gray-500 mb-2">Charts</h2>{{template "charts" .}}</section>
   <section><h2 class="text-sm font-semibold text-gray-500 mb-2">Recent Activity</h2>{{template "recent_activity" .}}</section>
