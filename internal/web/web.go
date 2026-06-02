@@ -95,6 +95,11 @@ func (h *Handler) Routes(static http.Handler) http.Handler {
 	r.Post("/api/gmail/sync", h.GmailSyncAPI)
 	r.Post("/api/alerts/run", h.AlertsRun)
 	r.Post("/api/nav/sync", h.NavSyncAPI)
+
+	// Versioned REST API + Swagger UI.
+	r.Route("/api/v1", h.apiV1Routes)
+	r.Get("/api/openapi.json", h.OpenAPISpec)
+	r.Get("/api/docs", h.APIDocs)
 	r.Post("/gmail/sync", h.GmailSyncUI)
 	r.Get("/", h.Dashboard)
 	r.Get("/partials/kpis", h.PartialKPIs)

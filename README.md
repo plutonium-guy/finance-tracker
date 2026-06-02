@@ -203,6 +203,22 @@ an HTML fragment) also exists for the browser; prefer the JSON API above for scr
 - `POST /api/alerts/run` → run the alert check (sends a Telegram message if any).
 - `POST /api/nav/sync` → refresh mutual-fund NAVs from AMFI.
 
+### Full REST API + Swagger UI
+A complete versioned JSON API lives under **`/api/v1`** (token-gated) with
+list/get/create/update/delete for transactions, accounts, cards, holdings,
+recurring, goals, budgets, and categories, plus `/net-worth` and the action
+endpoints. **All monetary fields are integer paise.**
+
+- **Swagger UI:** `GET /api/docs` (assets vendored — works offline)
+- **OpenAPI spec:** `GET /api/openapi.json`
+
+```sh
+curl http://<host>:8080/api/v1/accounts -H "Authorization: Bearer $API_PUSH_TOKEN"
+curl -X POST http://<host>:8080/api/v1/transactions \
+  -H "Authorization: Bearer $API_PUSH_TOKEN" -H "Content-Type: application/json" \
+  -d '{"amount":25000,"description":"Coffee","type":"Expense"}'   # 25000 paise = ₹250
+```
+
 ### Health check
 `GET /healthz` → `200 {"status":"ok"}` when the database is reachable.
 
