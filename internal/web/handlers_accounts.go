@@ -43,8 +43,10 @@ func (h *Handler) accountData() ([]service.AccountBalance, service.NetWorth) {
 	return balances, nw
 }
 
-// investmentValue is the total portfolio market value (0 until portfolio ships).
-func (h *Handler) investmentValue() domain.Money { return 0 }
+// investmentValue is the total portfolio market value (feeds net worth).
+func (h *Handler) investmentValue() domain.Money {
+	return h.portfolioSummary().MarketValue
+}
 
 func (h *Handler) AccountsPage(w http.ResponseWriter, r *http.Request) {
 	balances, nw := h.accountData()

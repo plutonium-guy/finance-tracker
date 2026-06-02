@@ -451,6 +451,9 @@ func (s *SQLite) Export() (Backup, error) {
 	if b.TransactionAccounts, err = s.TransactionAccountMap(); err != nil {
 		return b, err
 	}
+	if b.Holdings, err = s.ListHoldings(); err != nil {
+		return b, err
+	}
 	return b, nil
 }
 
@@ -462,6 +465,7 @@ func (s *SQLite) Import(b Backup) error {
 	defer tx.Rollback()
 
 	for _, stmt := range []string{
+		`DELETE FROM holdings`,
 		`DELETE FROM transaction_accounts`, `DELETE FROM accounts`,
 		`DELETE FROM statement_payments`, `DELETE FROM transaction_cards`, `DELETE FROM cards`,
 		`DELETE FROM transaction_tags`, `DELETE FROM tags`, `DELETE FROM budgets`, `DELETE FROM goals`,
@@ -532,6 +536,12 @@ func (s *SQLite) Import(b Backup) error {
 			return err
 		}
 	}
+	for _, hd := range b.Holdings {
+		if _, err := tx.Exec(`INSERT INTO holdings (`+holdingColumns+`) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+			hd.ID, hd.Name, hd.Type, hd.UnitsMicro, int64(hd.AvgCost), int64(hd.LastPrice), hd.SchemeCode, hd.LastPriceAt, hd.CreatedAt, hd.UpdatedAt); err != nil {
+			return err
+		}
+	}
 	if _, err := tx.Exec(`UPDATE settings SET currency=?, locale=?, month_format=?, date_format=?, fiscal_year_start=?, pay_cycle_enabled=?, dark_mode=? WHERE id=1`,
 		b.Settings.Currency, b.Settings.Locale, b.Settings.MonthFormat, b.Settings.DateFormat, b.Settings.FiscalYearStart, boolToInt(b.Settings.PayCycleEnabled), boolToInt(b.Settings.DarkMode)); err != nil {
 		return err
@@ -546,6 +556,7 @@ func (s *SQLite) Reset() error {
 	}
 	defer tx.Rollback()
 	for _, stmt := range []string{
+		`DELETE FROM holdings`,
 		`DELETE FROM transaction_accounts`, `DELETE FROM accounts`,
 		`DELETE FROM statement_payments`, `DELETE FROM transaction_cards`, `DELETE FROM cards`,
 		`DELETE FROM transaction_tags`, `DELETE FROM tags`, `DELETE FROM budgets`, `DELETE FROM goals`,

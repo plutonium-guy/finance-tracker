@@ -46,6 +46,9 @@ type Handler struct {
 
 	// Gmail import (POST /gmail/sync, POST /api/gmail/sync).
 	gmail GmailSyncer
+
+	// Mutual-fund NAV refresh (POST /portfolio/sync, POST /api/nav/sync).
+	nav NavSyncer
 }
 
 // NewHandler builds a Handler.
@@ -91,6 +94,7 @@ func (h *Handler) Routes(static http.Handler) http.Handler {
 	r.Post("/api/transactions", h.TransactionCreateAPI)
 	r.Post("/api/gmail/sync", h.GmailSyncAPI)
 	r.Post("/api/alerts/run", h.AlertsRun)
+	r.Post("/api/nav/sync", h.NavSyncAPI)
 	r.Post("/gmail/sync", h.GmailSyncUI)
 	r.Get("/", h.Dashboard)
 	r.Get("/partials/kpis", h.PartialKPIs)
@@ -143,6 +147,18 @@ func (h *Handler) Routes(static http.Handler) http.Handler {
 	r.Get("/budgets", h.BudgetsList)
 	r.Post("/budgets", h.BudgetSet)
 	r.Post("/budgets/{category}/delete", h.BudgetDelete)
+
+	// Investment portfolio.
+	r.Route("/portfolio", func(r chi.Router) {
+		r.Get("/", h.PortfolioPage)
+		r.Get("/list", h.PortfolioList)
+		r.Get("/new", h.HoldingNew)
+		r.Post("/", h.HoldingCreate)
+		r.Post("/sync", h.NavSyncUI)
+		r.Get("/{id}/edit", h.HoldingEdit)
+		r.Put("/{id}", h.HoldingUpdate)
+		r.Delete("/{id}", h.HoldingDelete)
+	})
 
 	// Accounts + net worth.
 	r.Route("/accounts", func(r chi.Router) {

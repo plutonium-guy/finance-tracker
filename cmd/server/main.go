@@ -20,6 +20,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"finance-tracker/internal/gmailsync"
+	"finance-tracker/internal/navsync"
 	"finance-tracker/internal/service"
 	"finance-tracker/internal/store"
 	"finance-tracker/internal/telegrambot"
@@ -117,6 +118,9 @@ func main() {
 
 	// Optional scheduled proactive alerts (budgets, card dues, recurring) via Telegram.
 	startAlerts(botCtx, h, botClient != nil)
+
+	// Mutual-fund NAV refresh (scheduled + POST /portfolio/sync, /api/nav/sync).
+	startNavSync(botCtx, svc, h)
 
 	handler := h.Routes(http.FileServer(http.FS(web.StaticFS())))
 
@@ -273,6 +277,58 @@ func startGmailSync(ctx context.Context, svc *service.Service, h *web.Handler) {
 			}
 		}
 	}()
+}
+
+// navRunner adapts a *navsync.Syncer to the web.NavSyncer interface.
+type navRunner struct{ s *navsync.Syncer }
+
+func (n navRunner) Run(ctx context.Context) (web.NavResult, error) {
+	r, err := n.s.Run(ctx)
+	return web.NavResult{Fetched: r.Fetched, Updated: r.Updated}, err
+}
+
+// startNavSync wires the AMFI NAV refresh (always enabled — no credentials
+// needed) and runs it on a schedule (NAV_SYNC_INTERVAL, default 12h).
+func startNavSync(ctx context.Context, svc *service.Service, h *web.Handler) {
+	syncer := navsync.NewSyncer(navsync.NewHTTPFetcher(), svc.Store, time.Now)
+	h.EnableNav(navRunner{syncer})
+
+	interval := 12 * time.Hour
+	if d, err := time.ParseDuration(os.Getenv("NAV_SYNC_INTERVAL")); err == nil && d > 0 {
+		interval = d
+	}
+	slog.Info("nav sync enabled", "interval", interval.String())
+	go func() {
+		first := time.NewTimer(60 * time.Second)
+		defer first.Stop()
+		select {
+		case <-ctx.Done():
+			return
+		case <-first.C:
+			navRun(ctx, syncer)
+		}
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				navRun(ctx, syncer)
+			}
+		}
+	}()
+}
+
+func navRun(ctx context.Context, syncer *navsync.Syncer) {
+	res, err := syncer.Run(ctx)
+	if err != nil {
+		slog.Error("nav sync", "err", err)
+		return
+	}
+	if res.Updated > 0 {
+		slog.Info("nav sync", "fetched", res.Fetched, "updated", res.Updated)
+	}
 }
 
 // startAlerts schedules proactive Telegram alerts when ALERTS_INTERVAL is set

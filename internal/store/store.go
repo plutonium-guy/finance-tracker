@@ -40,6 +40,7 @@ type Backup struct {
 	TransactionCards  map[string]string         `json:"transaction_cards,omitempty"` // txID -> cardID
 	Accounts            []domain.Account  `json:"accounts,omitempty"`
 	TransactionAccounts map[string]string `json:"transaction_accounts,omitempty"` // txID -> accountID
+	Holdings            []domain.Holding  `json:"holdings,omitempty"`
 }
 
 // Store is the persistence interface used by the service and web layers.
@@ -126,6 +127,14 @@ type Store interface {
 	SetTransactionAccount(txID, accountID string) error // "" clears
 	AccountOfTransaction(txID string) (string, error)
 	TransactionAccountMap() (map[string]string, error)
+
+	// investment holdings
+	ListHoldings() ([]domain.Holding, error)
+	GetHolding(id string) (domain.Holding, error)
+	CreateHolding(h domain.Holding) error
+	UpdateHolding(h domain.Holding) error
+	DeleteHolding(id string) error
+	SetHoldingPriceBySchemeCode(schemeCode string, pricePaise domain.Money, at string) (int, error)
 
 	// backup
 	Export() (Backup, error)

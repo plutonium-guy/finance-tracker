@@ -1,0 +1,13 @@
+{{define "content"}}
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-bold">Investment Portfolio</h1>
+    <div class="flex gap-2">
+      <button class="px-3 py-1.5 text-sm rounded border" hx-post="/portfolio/sync" hx-target="#portfolio-list" hx-swap="outerHTML" title="Refresh mutual-fund NAVs from AMFI">↻ Sync NAVs</button>
+      <button class="px-4 py-1.5 text-sm rounded bg-blue-700 text-white" hx-get="/portfolio/new" hx-target="#modal" hx-swap="innerHTML">+ Add Holding</button>
+    </div>
+  </div>
+  <p class="text-sm text-gray-500">Mutual-fund NAVs auto-update from AMFI when a scheme code is set. Stocks/gold: enter a last price manually.</p>
+  {{template "portfolio_list" .}}
+</div>
+{{end}}

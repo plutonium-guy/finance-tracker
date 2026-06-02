@@ -1,0 +1,94 @@
+{{define "portfolio_list"}}
+<div id="portfolio-list">
+  {{- $s := .Summary}}
+  <div class="card bg-white dark:bg-gray-800 p-4 mb-4">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div>
+        <div class="text-gray-500 text-xs">Invested</div>
+        <div class="num font-semibold">{{formatINR $s.Invested}}</div>
+      </div>
+      <div>
+        <div class="text-gray-500 text-xs">Current value</div>
+        <div class="num font-semibold">{{formatINR $s.MarketValue}}</div>
+      </div>
+      <div>
+        <div class="text-gray-500 text-xs">Gain / loss</div>
+        <div class="num font-semibold {{amountClass $s.PnL}}">{{formatINR $s.PnL}}</div>
+      </div>
+      <div>
+        <div class="text-gray-500 text-xs">Return</div>
+        <div class="num font-bold text-lg {{amountClass $s.PnL}}">{{pct $s.ReturnPct}}</div>
+      </div>
+    </div>
+    {{if $s.Allocation}}
+    <div class="mt-4">
+      <div class="text-gray-500 text-xs mb-1">Allocation</div>
+      <div class="flex h-3 rounded overflow-hidden">
+        {{range $i, $a := $s.Allocation}}<div style="width: {{barPct $a.Pct}}%; background: {{flowColor $i}}" title="{{$a.Type}} {{pct $a.Pct}}"></div>{{end}}
+      </div>
+      <div class="flex flex-wrap gap-3 mt-2 text-xs">
+        {{range $i, $a := $s.Allocation}}<span class="inline-flex items-center gap-1"><span class="inline-block w-2 h-2 rounded-full" style="background: {{flowColor $i}}"></span>{{$a.Type}} · {{pct $a.Pct}}</span>{{end}}
+      </div>
+    </div>
+    {{end}}
+  </div>
+
+  <div class="card bg-white dark:bg-gray-800 overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="text-left text-gray-500 border-b dark:border-gray-700">
+        <tr><th class="px-3 py-2">Holding</th><th class="px-3 py-2 text-right">Units</th><th class="px-3 py-2 text-right">Avg cost</th><th class="px-3 py-2 text-right">Price</th><th class="px-3 py-2 text-right">Value</th><th class="px-3 py-2 text-right">P&amp;L</th><th class="px-3 py-2"></th></tr>
+      </thead>
+      <tbody>
+        {{- if $s.Holdings}}
+        {{- range $s.Holdings}}
+        {{- $h := .Holding}}
+        <tr class="border-b dark:border-gray-700">
+          <td class="px-3 py-2">{{$h.Name}} <span class="text-gray-400 text-xs">{{$h.Type}}{{if $h.SchemeCode}} · {{$h.SchemeCode}}{{end}}</span></td>
+          <td class="px-3 py-2 num text-right">{{formatUnits $h.UnitsMicro}}</td>
+          <td class="px-3 py-2 num text-right">{{formatINR $h.AvgCost}}</td>
+          <td class="px-3 py-2 num text-right">{{if .Priced}}{{formatINR $h.LastPrice}}{{else}}<span class="text-gray-400">—</span>{{end}}</td>
+          <td class="px-3 py-2 num text-right">{{formatINR .MarketValue}}</td>
+          <td class="px-3 py-2 num text-right {{amountClass .PnL}}">{{formatINR .PnL}} <span class="text-xs">({{pct .ReturnPct}})</span></td>
+          <td class="px-3 py-2 text-right whitespace-nowrap">
+            <button class="text-blue-700" hx-get="/portfolio/{{$h.ID}}/edit" hx-target="#modal" hx-swap="innerHTML" title="Edit">✎</button>
+            <button class="text-red-600" hx-delete="/portfolio/{{$h.ID}}" hx-target="#portfolio-list" hx-swap="outerHTML" hx-confirm="Delete {{$h.Name}}?">🗑</button>
+          </td>
+        </tr>
+        {{- end}}
+        {{- else}}
+        <tr><td colspan="7" class="text-center text-gray-500 py-10">No holdings yet. Add a mutual fund (with its AMFI scheme code) or a stock.</td></tr>
+        {{- end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}
+
+{{define "holding_modal"}}
+{{- $h := .Holding}}
+<form class="card bg-white dark:bg-gray-800 p-5"
+      {{if $h}}hx-put="/portfolio/{{$h.ID}}"{{else}}hx-post="/portfolio"{{end}}
+      hx-target="#portfolio-list" hx-swap="outerHTML">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-lg font-semibold">{{if $h}}Edit{{else}}Add{{end}} Holding</h2>
+    <button type="button" class="text-gray-500" data-modal-close>✕</button>
+  </div>
+  {{if .Error}}<div class="text-red-600 text-sm mb-3">{{.Error}}</div>{{end}}
+  <div class="grid grid-cols-2 gap-3">
+    <label class="text-sm col-span-2">Name<input name="name" required value="{{if $h}}{{$h.Name}}{{end}}" placeholder="Parag Parikh Flexi Cap" class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600"></label>
+    <label class="text-sm">Type
+      <select name="type" class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">
+        {{range .Types}}<option {{if and $h (eq (printf "%s" $h.Type) (printf "%s" .))}}selected{{end}}>{{.}}</option>{{end}}
+      </select>
+    </label>
+    <label class="text-sm">AMFI scheme code / ticker<input name="scheme_code" value="{{if $h}}{{$h.SchemeCode}}{{end}}" placeholder="122639" class="mt-1 w-full border rounded px-2 py-1.5 num dark:bg-gray-700 dark:border-gray-600"></label>
+    <label class="text-sm">Units<input type="number" step="0.001" min="0" name="units" required value="{{.Units}}" class="mt-1 w-full border rounded px-2 py-1.5 num dark:bg-gray-700 dark:border-gray-600"></label>
+    <label class="text-sm">Avg cost / unit (₹)<input type="number" step="0.0001" min="0" name="avg_cost" required value="{{if $h}}{{rupees $h.AvgCost}}{{end}}" class="mt-1 w-full border rounded px-2 py-1.5 num dark:bg-gray-700 dark:border-gray-600"></label>
+    <label class="text-sm col-span-2">Last price / unit (₹) <span class="text-gray-400">— optional; auto-filled by NAV sync</span><input type="number" step="0.0001" min="0" name="last_price" value="{{if and $h (gt (rupees $h.LastPrice) 0.0)}}{{rupees $h.LastPrice}}{{end}}" class="mt-1 w-full border rounded px-2 py-1.5 num dark:bg-gray-700 dark:border-gray-600"></label>
+  </div>
+  <div class="mt-4 flex justify-end gap-2">
+    <button type="button" class="px-3 py-1.5 text-sm rounded border" data-modal-close>Cancel</button>
+    <button type="submit" class="px-4 py-1.5 text-sm rounded bg-blue-700 text-white">Save</button>
+  </div>
+</form>
+{{end}}

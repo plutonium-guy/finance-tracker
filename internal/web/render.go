@@ -35,6 +35,7 @@ var funcMap = template.FuncMap{
 	"formatDate":  formatDate,
 	"formatMonth": formatMonth,
 	"formatDay":   func(t time.Time) string { return t.Format("02 Jan 2006") },
+	"formatUnits": domain.FormatUnits,
 	"pct":         func(f float64) string { return fmt.Sprintf("%.1f%%", f*100) },
 	"pct0":        func(f float64) string { return fmt.Sprintf("%.0f%%", f*100) },
 	"barPct":      barPct,
@@ -122,7 +123,7 @@ type Renderer struct {
 
 // NewRenderer parses all embedded templates.
 func NewRenderer() (*Renderer, error) {
-	pageNames := []string{"dashboard", "transactions", "recurring", "month", "settings", "planning", "year", "cards", "accounts"}
+	pageNames := []string{"dashboard", "transactions", "recurring", "month", "settings", "planning", "year", "cards", "accounts", "portfolio"}
 	r := &Renderer{pages: map[string]*template.Template{}}
 
 	for _, name := range pageNames {
