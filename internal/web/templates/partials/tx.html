@@ -79,6 +79,14 @@
       </select>
     </label>
     {{end}}
+    {{if .Accounts}}
+    <label class="text-sm col-span-2">Account <span class="text-gray-400">(optional)</span>
+      <select name="account_id" class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">
+        <option value="">— none —</option>
+        {{range .Accounts}}<option value="{{.ID}}" {{if eq $.AccountID .ID}}selected{{end}}>{{.Name}}</option>{{end}}
+      </select>
+    </label>
+    {{end}}
     <label class="text-sm col-span-2">Category
       <select name="category" class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">
         {{range .Categories}}<option {{if and $tx (eq $tx.Category .Name)}}selected{{end}}>{{.Name}}</option>{{end}}

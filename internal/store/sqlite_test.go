@@ -275,6 +275,59 @@ func TestExportImportIncludesCards(t *testing.T) {
 	}
 }
 
+func TestAccountCRUDAndExport(t *testing.T) {
+	s := newTestStore(t)
+	acc := domain.Account{ID: "a1", Name: "HDFC", Type: domain.BankAccount, OpeningBalance: domain.ToPaise(100000), CreatedAt: "x", UpdatedAt: "x"}
+	if err := s.CreateAccount(acc); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.CreateTransaction(sampleTx("t1", "2026-06-10", "Salary", 8000000, domain.Income, "Travel"))
+	if err := s.SetTransactionAccount("t1", "a1"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.AccountOfTransaction("t1"); got != "a1" {
+		t.Errorf("AccountOfTransaction = %q, want a1", got)
+	}
+	if m, _ := s.TransactionAccountMap(); m["t1"] != "a1" {
+		t.Errorf("TransactionAccountMap[t1] = %q, want a1", m["t1"])
+	}
+
+	// Export → reset → import restores the account and its link.
+	exp, err := s.Export()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(exp.Accounts) != 1 || exp.TransactionAccounts["t1"] != "a1" {
+		t.Fatalf("export missing account data: %d accts, links=%v", len(exp.Accounts), exp.TransactionAccounts)
+	}
+	if err := s.Reset(); err != nil {
+		t.Fatal(err)
+	}
+	if accts, _ := s.ListAccounts(); len(accts) != 0 {
+		t.Fatalf("reset left %d accounts", len(accts))
+	}
+	if err := s.Import(exp); err != nil {
+		t.Fatal(err)
+	}
+	if accts, _ := s.ListAccounts(); len(accts) != 1 {
+		t.Errorf("import restored %d accounts, want 1", len(accts))
+	}
+	if got, _ := s.AccountOfTransaction("t1"); got != "a1" {
+		t.Errorf("import restored link = %q, want a1", got)
+	}
+
+	// Deleting the account cascades the link away (transaction stays).
+	if err := s.DeleteAccount("a1"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.AccountOfTransaction("t1"); got != "" {
+		t.Errorf("link survived account delete: %q", got)
+	}
+	if _, err := s.GetTransaction("t1"); err != nil {
+		t.Errorf("transaction removed by account delete: %v", err)
+	}
+}
+
 func TestIsEmpty(t *testing.T) {
 	s := newTestStore(t)
 	empty, _ := s.IsEmpty()

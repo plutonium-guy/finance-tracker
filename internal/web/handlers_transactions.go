@@ -163,6 +163,8 @@ type txModalVM struct {
 	Types      []domain.TransactionType
 	Cards      []domain.Card
 	CardID     string // currently linked card (for edit)
+	Accounts   []domain.Account
+	AccountID  string // currently linked account (for edit)
 	Today      string
 	TagList    string // comma-separated existing tags (for edit)
 	Error      string
@@ -172,8 +174,9 @@ type txModalVM struct {
 func (h *Handler) txModalBase() txModalVM {
 	cats, _ := h.svc.Store.ListCategories()
 	cards, _ := h.svc.Store.ListCards()
+	accounts, _ := h.svc.Store.ListAccounts()
 	return txModalVM{
-		Categories: cats, Methods: methods(), Types: types(), Cards: cards,
+		Categories: cats, Methods: methods(), Types: types(), Cards: cards, Accounts: accounts,
 		Today: h.svc.Now().Format("2006-01-02"),
 	}
 }
@@ -297,8 +300,9 @@ func (h *Handler) TransactionEdit(w http.ResponseWriter, r *http.Request) {
 	}
 	tags, _ := h.svc.Store.TagsFor(t.ID)
 	cardID, _ := h.svc.Store.CardOfTransaction(t.ID)
+	acctID, _ := h.svc.Store.AccountOfTransaction(t.ID)
 	vm := h.txModalBase()
-	vm.Tx, vm.TagList, vm.CardID = &t, strings.Join(tags, ", "), cardID
+	vm.Tx, vm.TagList, vm.CardID, vm.AccountID = &t, strings.Join(tags, ", "), cardID, acctID
 	h.rdr.Fragment(w, "tx_modal", vm)
 }
 
@@ -328,6 +332,7 @@ func (h *Handler) TransactionCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	h.svc.Store.SetTransactionTags(t.ID, parseTags(r.FormValue("tags")))
 	h.svc.Store.SetTransactionCard(t.ID, h.cardIDForForm(r, t))
+	h.svc.Store.SetTransactionAccount(t.ID, strings.TrimSpace(r.FormValue("account_id")))
 	txTrigger(w)
 	// OOB insert into #tx-rows (no-ops on pages without the table).
 	h.rdr.Fragment(w, "tx_created", h.one(t))
@@ -353,6 +358,7 @@ func (h *Handler) TransactionUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	h.svc.Store.SetTransactionTags(t.ID, parseTags(r.FormValue("tags")))
 	h.svc.Store.SetTransactionCard(t.ID, h.cardIDForForm(r, t))
+	h.svc.Store.SetTransactionAccount(t.ID, strings.TrimSpace(r.FormValue("account_id")))
 	txTrigger(w)
 	h.rdr.Fragment(w, "tx_row", h.one(t))
 }

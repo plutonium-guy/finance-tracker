@@ -1,0 +1,9 @@
+{{define "content"}}
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-bold">Accounts &amp; Net Worth</h1>
+    <button class="px-4 py-1.5 text-sm rounded bg-blue-700 text-white" hx-get="/accounts/new" hx-target="#modal" hx-swap="innerHTML">+ Add Account</button>
+  </div>
+  {{template "accounts_list" .}}
+</div>
+{{end}}

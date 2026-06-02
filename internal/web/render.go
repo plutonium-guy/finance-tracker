@@ -122,7 +122,7 @@ type Renderer struct {
 
 // NewRenderer parses all embedded templates.
 func NewRenderer() (*Renderer, error) {
-	pageNames := []string{"dashboard", "transactions", "recurring", "month", "settings", "planning", "year", "cards"}
+	pageNames := []string{"dashboard", "transactions", "recurring", "month", "settings", "planning", "year", "cards", "accounts"}
 	r := &Renderer{pages: map[string]*template.Template{}}
 
 	for _, name := range pageNames {

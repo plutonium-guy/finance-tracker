@@ -144,6 +144,17 @@ func (h *Handler) Routes(static http.Handler) http.Handler {
 	r.Post("/budgets", h.BudgetSet)
 	r.Post("/budgets/{category}/delete", h.BudgetDelete)
 
+	// Accounts + net worth.
+	r.Route("/accounts", func(r chi.Router) {
+		r.Get("/", h.AccountsPage)
+		r.Get("/list", h.AccountsList)
+		r.Get("/new", h.AccountNew)
+		r.Post("/", h.AccountCreate)
+		r.Get("/{id}/edit", h.AccountEdit)
+		r.Put("/{id}", h.AccountUpdate)
+		r.Delete("/{id}", h.AccountDelete)
+	})
+
 	// Credit cards + billing cycles.
 	r.Route("/cards", func(r chi.Router) {
 		r.Get("/", h.CardsPage)

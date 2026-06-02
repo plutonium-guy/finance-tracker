@@ -1,0 +1,74 @@
+{{define "accounts_list"}}
+<div id="accounts-list" hx-get="/accounts/list" hx-trigger="txChanged from:body" hx-swap="outerHTML">
+  {{- $nw := .NetWorth}}
+  <div class="card bg-white dark:bg-gray-800 p-4 mb-4">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div>
+        <div class="text-gray-500 text-xs">Accounts</div>
+        <div class="num font-semibold {{amountClass $nw.Accounts}}">{{formatINR $nw.Accounts}}</div>
+      </div>
+      <div>
+        <div class="text-gray-500 text-xs">Investments</div>
+        <div class="num font-semibold">{{formatINR $nw.Investments}}</div>
+      </div>
+      <div>
+        <div class="text-gray-500 text-xs">Card outstanding</div>
+        <div class="num font-semibold text-red-600">{{formatINR $nw.CardOutstanding}}</div>
+      </div>
+      <div>
+        <div class="text-gray-500 text-xs">Net worth</div>
+        <div class="num font-bold text-lg {{amountClass $nw.Total}}">{{formatINR $nw.Total}}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {{- if .Balances}}
+    {{- range .Balances}}
+    {{- $a := .Account}}
+    <div class="card bg-white dark:bg-gray-800 p-4">
+      <div class="flex items-start justify-between">
+        <div>
+          <h3 class="font-semibold">{{$a.Name}}</h3>
+          <div class="text-xs text-gray-500">{{$a.Type}} · opening {{formatINR $a.OpeningBalance}}</div>
+        </div>
+        <div class="flex gap-1">
+          <button class="text-blue-700 text-sm" hx-get="/accounts/{{$a.ID}}/edit" hx-target="#modal" hx-swap="innerHTML" title="Edit">✎</button>
+          <button class="text-red-600 text-sm" hx-delete="/accounts/{{$a.ID}}" hx-target="#accounts-list" hx-swap="outerHTML" hx-confirm="Delete account {{$a.Name}}? (transaction links are removed; the transactions stay)">🗑</button>
+        </div>
+      </div>
+      <div class="num font-bold text-lg mt-2 {{amountClass .Balance}}">{{formatINR .Balance}}</div>
+    </div>
+    {{- end}}
+    {{- else}}
+    <p class="text-gray-500">No accounts yet. Add one and set its opening balance; assign transactions to it to track the running balance.</p>
+    {{- end}}
+  </div>
+</div>
+{{end}}
+
+{{define "account_modal"}}
+{{- $a := .Account}}
+<form class="card bg-white dark:bg-gray-800 p-5"
+      {{if $a}}hx-put="/accounts/{{$a.ID}}"{{else}}hx-post="/accounts"{{end}}
+      hx-target="#accounts-list" hx-swap="outerHTML">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-lg font-semibold">{{if $a}}Edit{{else}}Add{{end}} Account</h2>
+    <button type="button" class="text-gray-500" data-modal-close>✕</button>
+  </div>
+  {{if .Error}}<div class="text-red-600 text-sm mb-3">{{.Error}}</div>{{end}}
+  <div class="grid grid-cols-2 gap-3">
+    <label class="text-sm col-span-2">Name<input name="name" required value="{{if $a}}{{$a.Name}}{{end}}" placeholder="HDFC Savings" class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600"></label>
+    <label class="text-sm">Type
+      <select name="type" class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">
+        {{range .Types}}<option {{if and $a (eq (printf "%s" $a.Type) (printf "%s" .))}}selected{{end}}>{{.}}</option>{{end}}
+      </select>
+    </label>
+    <label class="text-sm">Opening balance (₹)<input type="number" step="0.01" name="opening" value="{{if $a}}{{rupees $a.OpeningBalance}}{{end}}" class="mt-1 w-full border rounded px-2 py-1.5 num dark:bg-gray-700 dark:border-gray-600"></label>
+  </div>
+  <div class="mt-4 flex justify-end gap-2">
+    <button type="button" class="px-3 py-1.5 text-sm rounded border" data-modal-close>Cancel</button>
+    <button type="submit" class="px-4 py-1.5 text-sm rounded bg-blue-700 text-white">Save</button>
+  </div>
+</form>
+{{end}}
