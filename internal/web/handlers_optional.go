@@ -215,33 +215,7 @@ func (h *Handler) BudgetDelete(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) RecurringFire(w http.ResponseWriter, r *http.Request) {
 	month := h.svc.CurrentMonth()
-	items, _ := h.svc.Store.ListRecurring()
-	due := service.DueRecurring(items, month, func(id string) bool {
-		posted, _ := h.svc.Store.WasPosted(id, month)
-		return posted
-	})
-	now := h.svc.Now().UTC().Format(time.RFC3339)
-	posted := 0
-	for _, r := range due {
-		t := domain.Transaction{
-			ID:            uuid.NewString(),
-			Date:          service.PostingDate(r, month),
-			Description:   r.Name,
-			Amount:        r.Amount,
-			Type:          r.Type,
-			PaymentMethod: r.PaymentMethod,
-			Category:      r.Category,
-			CreatedAt:     now,
-			UpdatedAt:     now,
-		}
-		note := "auto-posted from recurring"
-		t.Notes = &note
-		if err := h.svc.Store.CreateTransaction(t); err != nil {
-			continue
-		}
-		h.svc.Store.MarkPosted(r.ID, month, t.ID, now)
-		posted++
-	}
+	posted, _ := h.svc.PostDue(month)
 	txTrigger(w)
 	h.flash(w, fmt.Sprintf("Posted %d due recurring item(s) for %s", posted, service.MonthKey(h.svc.Now())))
 }

@@ -3,12 +3,21 @@ package web
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
 	"finance-tracker/internal/domain"
 	"finance-tracker/internal/store"
 )
+
+// validCategoryName rejects names that can't be safely round-tripped through
+// the /categories/{name}/... URL path. chi matches a single path segment, so a
+// '/' (even percent-encoded) breaks rename/delete; we also bound the length.
+func validCategoryName(s string) bool {
+	s = strings.TrimSpace(s)
+	return s != "" && len(s) <= 40 && !strings.ContainsAny(s, "/\\")
+}
 
 type settingsVM struct {
 	base
@@ -47,7 +56,12 @@ func (h *Handler) CategoriesList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) CategoryAdd(w http.ResponseWriter, r *http.Request) {
-	name := r.FormValue("name")
+	name := strings.TrimSpace(r.FormValue("name"))
+	if name != "" && !validCategoryName(name) {
+		w.Header().Set("HX-Retarget", "#flash")
+		h.flash(w, "Invalid category name (no '/' or '\\', max 40 chars)")
+		return
+	}
 	if name != "" {
 		h.svc.Store.AddCategory(name)
 	}
@@ -60,6 +74,12 @@ func (h *Handler) CategoryRename(w http.ResponseWriter, r *http.Request) {
 	newName := r.Header.Get("HX-Prompt")
 	if newName == "" {
 		newName = r.FormValue("new_name")
+	}
+	newName = strings.TrimSpace(newName)
+	if newName != "" && !validCategoryName(newName) {
+		w.Header().Set("HX-Retarget", "#flash")
+		h.flash(w, "Invalid category name (no '/' or '\\', max 40 chars)")
+		return
 	}
 	if newName != "" {
 		h.svc.Store.RenameCategory(old, newName)

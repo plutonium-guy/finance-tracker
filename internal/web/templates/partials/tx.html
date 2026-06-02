@@ -40,6 +40,7 @@
 {{define "tx_modal"}}
 {{- $tx := .Tx}}
 <form class="card bg-white dark:bg-gray-800 p-5"
+      x-data="{ method: '{{if $tx}}{{$tx.PaymentMethod}}{{else}}UPI{{end}}' }"
       {{if $tx}}hx-put="/transactions/{{$tx.ID}}" hx-target="#tx-{{$tx.ID}}" hx-swap="outerHTML"
       {{else}}hx-post="/transactions" hx-swap="none"{{end}}>
   <div class="flex items-center justify-between mb-4">
@@ -66,10 +67,26 @@
       </select>
     </label>
     <label class="text-sm">Payment Method
-      <select name="payment_method" class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">
+      <select name="payment_method" x-model="method" class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">
         {{range .Methods}}<option {{if and $tx (eq (printf "%s" $tx.PaymentMethod) (printf "%s" .))}}selected{{end}}>{{.}}</option>{{end}}
       </select>
     </label>
+    {{if .Cards}}
+    <label class="text-sm col-span-2" x-show="method === 'Credit Card'" x-cloak>Card
+      <select name="card_id" class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">
+        <option value="">— none —</option>
+        {{range .Cards}}<option value="{{.ID}}" {{if eq $.CardID .ID}}selected{{end}}>{{.Name}}{{if .Last4}} ····{{.Last4}}{{end}}</option>{{end}}
+      </select>
+    </label>
+    {{end}}
+    {{if .Accounts}}
+    <label class="text-sm col-span-2">Account <span class="text-gray-400">(optional)</span>
+      <select name="account_id" class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">
+        <option value="">— none —</option>
+        {{range .Accounts}}<option value="{{.ID}}" {{if eq $.AccountID .ID}}selected{{end}}>{{.Name}}</option>{{end}}
+      </select>
+    </label>
+    {{end}}
     <label class="text-sm col-span-2">Category
       <select name="category" class="mt-1 w-full border rounded px-2 py-1.5 dark:bg-gray-700 dark:border-gray-600">
         {{range .Categories}}<option {{if and $tx (eq $tx.Category .Name)}}selected{{end}}>{{.Name}}</option>{{end}}

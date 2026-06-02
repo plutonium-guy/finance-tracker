@@ -12,6 +12,7 @@ type dashboardVM struct {
 	Month     string
 	KPIs      service.KPIs
 	PayCycle  service.PayCycleKPIs
+	Forecast  service.Forecast
 	ChartJSON any // ChartData struct; html/template JSON-encodes it in the island
 	Recent    []domain.Transaction
 	Top       []domain.Transaction
@@ -31,12 +32,20 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		Month:     month,
 		KPIs:      h.svc.KPIsFor(txs, month),
 		PayCycle:  h.svc.PayCycleFor(txs, rec, month),
+		Forecast:  h.svc.ForecastFor(txs, rec, month),
 		ChartJSON: h.svc.ChartDataFor(txs),
 		Recent:    service.Recent(txs, 10),
 		Top:       service.TopExpenses(txs, 5),
 		Goals:     h.goalProgress(),
 	}
 	h.rdr.Page(w, "dashboard", vm)
+}
+
+func (h *Handler) PartialForecast(w http.ResponseWriter, r *http.Request) {
+	month := h.currentMonthOr(r)
+	txs, _ := h.svc.Store.AllTransactions()
+	rec, _ := h.svc.Store.ListRecurring()
+	h.rdr.Fragment(w, "forecast", dashboardVM{Month: month, Forecast: h.svc.ForecastFor(txs, rec, month)})
 }
 
 func (h *Handler) PartialKPIs(w http.ResponseWriter, r *http.Request) {

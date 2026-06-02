@@ -46,6 +46,9 @@ type Handler struct {
 
 	// Gmail import (POST /gmail/sync, POST /api/gmail/sync).
 	gmail GmailSyncer
+
+	// Mutual-fund NAV refresh (POST /portfolio/sync, POST /api/nav/sync).
+	nav NavSyncer
 }
 
 // NewHandler builds a Handler.
@@ -88,13 +91,22 @@ func (h *Handler) Routes(static http.Handler) http.Handler {
 
 	r.Get("/healthz", h.Health)
 	r.Post("/api/push", h.Push)
+	r.Post("/api/transactions", h.TransactionCreateAPI)
 	r.Post("/api/gmail/sync", h.GmailSyncAPI)
+	r.Post("/api/alerts/run", h.AlertsRun)
+	r.Post("/api/nav/sync", h.NavSyncAPI)
+
+	// Versioned REST API + Swagger UI.
+	r.Route("/api/v1", h.apiV1Routes)
+	r.Get("/api/openapi.json", h.OpenAPISpec)
+	r.Get("/api/docs", h.APIDocs)
 	r.Post("/gmail/sync", h.GmailSyncUI)
 	r.Get("/", h.Dashboard)
 	r.Get("/partials/kpis", h.PartialKPIs)
 	r.Get("/partials/paycycle", h.PartialPayCycle)
 	r.Get("/partials/charts", h.PartialCharts)
 	r.Get("/partials/recent", h.PartialRecent)
+	r.Get("/partials/forecast", h.PartialForecast)
 
 	r.Route("/transactions", func(r chi.Router) {
 		r.Get("/", h.TransactionsPage)
@@ -103,6 +115,7 @@ func (h *Handler) Routes(static http.Handler) http.Handler {
 		r.Get("/export", h.TransactionsExport)
 		r.Post("/", h.TransactionCreate)
 		r.Post("/import", h.TransactionsImport)
+		r.Post("/import-pdf", h.TransactionsImportPDF)
 		r.Post("/bulk", h.TransactionsBulk)
 		r.Get("/{id}/edit", h.TransactionEdit)
 		r.Put("/{id}", h.TransactionUpdate)
@@ -141,9 +154,48 @@ func (h *Handler) Routes(static http.Handler) http.Handler {
 	r.Post("/budgets", h.BudgetSet)
 	r.Post("/budgets/{category}/delete", h.BudgetDelete)
 
+	// Investment portfolio.
+	r.Route("/portfolio", func(r chi.Router) {
+		r.Get("/", h.PortfolioPage)
+		r.Get("/list", h.PortfolioList)
+		r.Get("/new", h.HoldingNew)
+		r.Post("/", h.HoldingCreate)
+		r.Post("/sync", h.NavSyncUI)
+		r.Get("/{id}/edit", h.HoldingEdit)
+		r.Put("/{id}", h.HoldingUpdate)
+		r.Delete("/{id}", h.HoldingDelete)
+	})
+
+	// Accounts + net worth.
+	r.Route("/accounts", func(r chi.Router) {
+		r.Get("/", h.AccountsPage)
+		r.Get("/list", h.AccountsList)
+		r.Get("/new", h.AccountNew)
+		r.Post("/", h.AccountCreate)
+		r.Get("/{id}/edit", h.AccountEdit)
+		r.Put("/{id}", h.AccountUpdate)
+		r.Delete("/{id}", h.AccountDelete)
+	})
+
+	// Credit cards + billing cycles.
+	r.Route("/cards", func(r chi.Router) {
+		r.Get("/", h.CardsPage)
+		r.Get("/list", h.CardsList)
+		r.Get("/new", h.CardNew)
+		r.Post("/", h.CardCreate)
+		r.Get("/{id}/edit", h.CardEdit)
+		r.Put("/{id}", h.CardUpdate)
+		r.Delete("/{id}", h.CardDelete)
+		r.Post("/{id}/pay", h.CardPay)
+	})
+
 	// Year-end sankey.
 	r.Get("/year", h.YearPage)
 	r.Get("/year/detail", h.YearDetail)
+
+	r.Get("/reimbursements", h.ReimbursementsPage)
+	r.Get("/reimbursements/list", h.ReimbursementsList)
+	r.Post("/reimbursements/{id}/settle", h.ReimbursementToggle)
 
 	r.Get("/settings", h.SettingsPage)
 	r.Post("/settings", h.SettingsSave)

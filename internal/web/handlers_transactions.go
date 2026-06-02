@@ -1,9 +1,12 @@
 package web
 
 import (
+	"bytes"
 	"encoding/csv"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,8 +16,128 @@ import (
 	"github.com/google/uuid"
 
 	"finance-tracker/internal/domain"
+	"finance-tracker/internal/pdfimport"
 	"finance-tracker/internal/store"
 )
+
+// txAPIRequest is the JSON body accepted by POST /api/transactions. amount is in
+// rupees. Empty optional fields fall back to sensible defaults.
+type txAPIRequest struct {
+	Date          string   `json:"date"`           // YYYY-MM-DD; default today
+	Amount        float64  `json:"amount"`         // rupees; required, > 0
+	Description   string   `json:"description"`    // required
+	Type          string   `json:"type"`           // default Expense
+	PaymentMethod string   `json:"payment_method"` // default UPI
+	Category      string   `json:"category"`       // default Miscellaneous
+	Notes         string   `json:"notes"`
+	Tags          []string `json:"tags"`
+	CardID        string   `json:"card_id"`
+}
+
+// txAPIResponse is the JSON returned for a created transaction.
+type txAPIResponse struct {
+	ID            string   `json:"id"`
+	Date          string   `json:"date"`
+	Amount        float64  `json:"amount"` // rupees
+	AmountPaise   int64    `json:"amount_paise"`
+	Description   string   `json:"description"`
+	Type          string   `json:"type"`
+	PaymentMethod string   `json:"payment_method"`
+	Category      string   `json:"category"`
+	Notes         string   `json:"notes,omitempty"`
+	Tags          []string `json:"tags,omitempty"`
+	CardID        string   `json:"card_id,omitempty"`
+}
+
+// TransactionCreateAPI creates a transaction from a JSON body. Token-protected,
+// for scripts/cron:
+//
+//	curl -X POST http://host:8080/api/transactions \
+//	  -H 'Authorization: Bearer $API_PUSH_TOKEN' \
+//	  -H 'Content-Type: application/json' \
+//	  -d '{"amount":250,"description":"Coffee","category":"Miscellaneous"}'
+func (h *Handler) TransactionCreateAPI(w http.ResponseWriter, r *http.Request) {
+	if h.apiToken == "" {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "api not configured (set API_PUSH_TOKEN)"})
+		return
+	}
+	if !h.apiAuthorized(r) {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
+		return
+	}
+
+	var req txAPIRequest
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid JSON body"})
+		return
+	}
+
+	// Defaults for omitted fields.
+	t := domain.Transaction{
+		Date:          strings.TrimSpace(req.Date),
+		Description:   strings.TrimSpace(req.Description),
+		Type:          domain.TransactionType(strDefault(req.Type, string(domain.Expense))),
+		PaymentMethod: domain.PaymentMethod(strDefault(req.PaymentMethod, string(domain.UPI))),
+		Category:      strDefault(strings.TrimSpace(req.Category), h.defaultCategory()),
+	}
+	if t.Date == "" {
+		t.Date = h.svc.Now().Format("2006-01-02")
+	}
+	if n := strings.TrimSpace(req.Notes); n != "" {
+		t.Notes = &n
+	}
+
+	// Validate (mirrors the web form rules).
+	if req.Amount <= 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "amount must be a positive number (rupees)"})
+		return
+	}
+	t.Amount = domain.ToPaise(req.Amount)
+	if t.Description == "" || len(t.Description) > 200 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "description is required (≤200 chars)"})
+		return
+	}
+	if !domain.IsValidType(t.Type) {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid type (Income|Expense|Transfer)"})
+		return
+	}
+	if !domain.IsValidPaymentMethod(t.PaymentMethod) {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid payment_method"})
+		return
+	}
+	if _, err := time.Parse("2006-01-02", t.Date); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid date (want YYYY-MM-DD)"})
+		return
+	}
+
+	now := h.svc.Now().UTC().Format(time.RFC3339)
+	t.ID = uuid.NewString()
+	t.CreatedAt, t.UpdatedAt = now, now
+	if err := h.svc.Store.CreateTransaction(t); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": friendly(err)})
+		return
+	}
+	tags := req.Tags
+	h.svc.Store.SetTransactionTags(t.ID, tags)
+	cardID := ""
+	if t.PaymentMethod == domain.CreditCard {
+		cardID = strings.TrimSpace(req.CardID)
+		h.svc.Store.SetTransactionCard(t.ID, cardID)
+	}
+
+	writeJSON(w, http.StatusCreated, txAPIResponse{
+		ID: t.ID, Date: t.Date, Amount: req.Amount, AmountPaise: int64(t.Amount),
+		Description: t.Description, Type: string(t.Type), PaymentMethod: string(t.PaymentMethod),
+		Category: t.Category, Notes: req.Notes, Tags: tags, CardID: cardID,
+	})
+}
+
+func strDefault(v, def string) string {
+	if strings.TrimSpace(v) == "" {
+		return def
+	}
+	return v
+}
 
 // txRow is a transaction decorated with its tags for table rendering.
 type txRow struct {
@@ -41,9 +164,33 @@ type txModalVM struct {
 	Categories []domain.Category
 	Methods    []domain.PaymentMethod
 	Types      []domain.TransactionType
+	Cards      []domain.Card
+	CardID     string // currently linked card (for edit)
+	Accounts   []domain.Account
+	AccountID  string // currently linked account (for edit)
 	Today      string
 	TagList    string // comma-separated existing tags (for edit)
 	Error      string
+}
+
+// txModalBase builds the modal VM fields shared by new/edit/error renders.
+func (h *Handler) txModalBase() txModalVM {
+	cats, _ := h.svc.Store.ListCategories()
+	cards, _ := h.svc.Store.ListCards()
+	accounts, _ := h.svc.Store.ListAccounts()
+	return txModalVM{
+		Categories: cats, Methods: methods(), Types: types(), Cards: cards, Accounts: accounts,
+		Today: h.svc.Now().Format("2006-01-02"),
+	}
+}
+
+// cardIDForForm returns the card to link a transaction to: the posted card_id
+// when the method is Credit Card, else "" (which clears any existing link).
+func (h *Handler) cardIDForForm(r *http.Request, t domain.Transaction) string {
+	if t.PaymentMethod != domain.CreditCard {
+		return ""
+	}
+	return strings.TrimSpace(r.FormValue("card_id"))
 }
 
 // decorate attaches each transaction's tags for rendering.
@@ -145,11 +292,7 @@ func (h *Handler) filterByTag(r *http.Request, txs []domain.Transaction, total i
 }
 
 func (h *Handler) TransactionNew(w http.ResponseWriter, r *http.Request) {
-	cats, _ := h.svc.Store.ListCategories()
-	h.rdr.Fragment(w, "tx_modal", txModalVM{
-		Categories: cats, Methods: methods(), Types: types(),
-		Today: h.svc.Now().Format("2006-01-02"),
-	})
+	h.rdr.Fragment(w, "tx_modal", h.txModalBase())
 }
 
 func (h *Handler) TransactionEdit(w http.ResponseWriter, r *http.Request) {
@@ -158,12 +301,12 @@ func (h *Handler) TransactionEdit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", 404)
 		return
 	}
-	cats, _ := h.svc.Store.ListCategories()
 	tags, _ := h.svc.Store.TagsFor(t.ID)
-	h.rdr.Fragment(w, "tx_modal", txModalVM{
-		Tx: &t, Categories: cats, Methods: methods(), Types: types(),
-		Today: h.svc.Now().Format("2006-01-02"), TagList: strings.Join(tags, ", "),
-	})
+	cardID, _ := h.svc.Store.CardOfTransaction(t.ID)
+	acctID, _ := h.svc.Store.AccountOfTransaction(t.ID)
+	vm := h.txModalBase()
+	vm.Tx, vm.TagList, vm.CardID, vm.AccountID = &t, strings.Join(tags, ", "), cardID, acctID
+	h.rdr.Fragment(w, "tx_modal", vm)
 }
 
 func (h *Handler) modalError(w http.ResponseWriter, name string, vm any) {
@@ -176,19 +319,23 @@ func (h *Handler) modalError(w http.ResponseWriter, name string, vm any) {
 func (h *Handler) TransactionCreate(w http.ResponseWriter, r *http.Request) {
 	t, err := h.parseTxForm(r, domain.Transaction{})
 	if err != nil {
-		cats, _ := h.svc.Store.ListCategories()
-		h.modalError(w, "tx_modal", txModalVM{Tx: nil, Categories: cats, Methods: methods(), Types: types(), Today: h.svc.Now().Format("2006-01-02"), Error: err.Error()})
+		vm := h.txModalBase()
+		vm.Error = err.Error()
+		h.modalError(w, "tx_modal", vm)
 		return
 	}
 	now := h.svc.Now().UTC().Format(time.RFC3339)
 	t.ID = uuid.NewString()
 	t.CreatedAt, t.UpdatedAt = now, now
 	if err := h.svc.Store.CreateTransaction(t); err != nil {
-		cats, _ := h.svc.Store.ListCategories()
-		h.modalError(w, "tx_modal", txModalVM{Categories: cats, Methods: methods(), Types: types(), Today: h.svc.Now().Format("2006-01-02"), Error: friendly(err)})
+		vm := h.txModalBase()
+		vm.Error = friendly(err)
+		h.modalError(w, "tx_modal", vm)
 		return
 	}
 	h.svc.Store.SetTransactionTags(t.ID, parseTags(r.FormValue("tags")))
+	h.svc.Store.SetTransactionCard(t.ID, h.cardIDForForm(r, t))
+	h.svc.Store.SetTransactionAccount(t.ID, strings.TrimSpace(r.FormValue("account_id")))
 	txTrigger(w)
 	// OOB insert into #tx-rows (no-ops on pages without the table).
 	h.rdr.Fragment(w, "tx_created", h.one(t))
@@ -202,8 +349,9 @@ func (h *Handler) TransactionUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	t, err := h.parseTxForm(r, existing)
 	if err != nil {
-		cats, _ := h.svc.Store.ListCategories()
-		h.modalError(w, "tx_modal", txModalVM{Tx: &existing, Categories: cats, Methods: methods(), Types: types(), Today: h.svc.Now().Format("2006-01-02"), Error: err.Error()})
+		vm := h.txModalBase()
+		vm.Tx, vm.Error = &existing, err.Error()
+		h.modalError(w, "tx_modal", vm)
 		return
 	}
 	t.UpdatedAt = h.svc.Now().UTC().Format(time.RFC3339)
@@ -212,6 +360,8 @@ func (h *Handler) TransactionUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.svc.Store.SetTransactionTags(t.ID, parseTags(r.FormValue("tags")))
+	h.svc.Store.SetTransactionCard(t.ID, h.cardIDForForm(r, t))
+	h.svc.Store.SetTransactionAccount(t.ID, strings.TrimSpace(r.FormValue("account_id")))
 	txTrigger(w)
 	h.rdr.Fragment(w, "tx_row", h.one(t))
 }
@@ -381,6 +531,46 @@ func (h *Handler) TransactionsImport(w http.ResponseWriter, r *http.Request) {
 	}
 	txTrigger(w)
 	h.flash(w, fmt.Sprintf("Imported %d transactions (%d skipped)", imported, skipped))
+}
+
+// TransactionsImportPDF is a best-effort import of a bank/card statement PDF.
+// Layouts are bank-specific, so detected rows should be reviewed afterwards.
+func (h *Handler) TransactionsImportPDF(w http.ResponseWriter, r *http.Request) {
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		h.flash(w, "No file uploaded")
+		return
+	}
+	defer file.Close()
+	data, err := io.ReadAll(http.MaxBytesReader(w, file, 20<<20)) // 20MB cap
+	if err != nil {
+		h.flash(w, "Could not read file")
+		return
+	}
+	lines, err := pdfimport.ExtractLines(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		w.Header().Set("HX-Retarget", "#flash")
+		h.flash(w, "Could not read PDF (is it a real, non-scanned statement?): "+err.Error())
+		return
+	}
+	cands := pdfimport.ParseLines(lines)
+	now := h.svc.Now().UTC().Format(time.RFC3339)
+	imported := 0
+	for _, c := range cands {
+		if c.Description == "" || c.Amount <= 0 {
+			continue
+		}
+		t := domain.Transaction{
+			ID: uuid.NewString(), Date: c.Date, Description: c.Description,
+			Amount: domain.ToPaise(c.Amount), Type: c.Type, PaymentMethod: domain.OtherMethod,
+			Category: "Miscellaneous", CreatedAt: now, UpdatedAt: now,
+		}
+		if h.svc.Store.CreateTransaction(t) == nil {
+			imported++
+		}
+	}
+	txTrigger(w)
+	h.flash(w, fmt.Sprintf("PDF: imported %d transaction(s) from %d detected lines — review and re-categorise.", imported, len(cands)))
 }
 
 // indexHeaders maps lowercased trimmed header names to their column index.

@@ -436,6 +436,24 @@ func (s *SQLite) Export() (Backup, error) {
 	if b.Tags, err = s.ListTags(); err != nil {
 		return b, err
 	}
+	if b.Cards, err = s.ListCards(); err != nil {
+		return b, err
+	}
+	if b.StatementPayments, err = s.allStatementPayments(); err != nil {
+		return b, err
+	}
+	if b.TransactionCards, err = s.TransactionCardMap(); err != nil {
+		return b, err
+	}
+	if b.Accounts, err = s.ListAccounts(); err != nil {
+		return b, err
+	}
+	if b.TransactionAccounts, err = s.TransactionAccountMap(); err != nil {
+		return b, err
+	}
+	if b.Holdings, err = s.ListHoldings(); err != nil {
+		return b, err
+	}
 	return b, nil
 }
 
@@ -447,6 +465,9 @@ func (s *SQLite) Import(b Backup) error {
 	defer tx.Rollback()
 
 	for _, stmt := range []string{
+		`DELETE FROM holdings`,
+		`DELETE FROM transaction_accounts`, `DELETE FROM accounts`,
+		`DELETE FROM statement_payments`, `DELETE FROM transaction_cards`, `DELETE FROM cards`,
 		`DELETE FROM transaction_tags`, `DELETE FROM tags`, `DELETE FROM budgets`, `DELETE FROM goals`,
 		`DELETE FROM transactions`, `DELETE FROM recurring_items`, `DELETE FROM categories`,
 	} {
@@ -487,6 +508,40 @@ func (s *SQLite) Import(b Backup) error {
 			return err
 		}
 	}
+	for _, c := range b.Cards {
+		if _, err := tx.Exec(`INSERT INTO cards (`+cardColumns+`) VALUES (?,?,?,?,?,?,?,?)`,
+			c.ID, c.Name, c.Last4, int64(c.Limit), c.StatementDay, c.DueOffsetDays, c.CreatedAt, c.UpdatedAt); err != nil {
+			return err
+		}
+	}
+	for txID, cardID := range b.TransactionCards {
+		if _, err := tx.Exec(`INSERT INTO transaction_cards (transaction_id, card_id) VALUES (?, ?)`, txID, cardID); err != nil {
+			return err
+		}
+	}
+	for _, p := range b.StatementPayments {
+		if _, err := tx.Exec(`INSERT INTO statement_payments (card_id, period_end, amount_paise, transaction_id, paid_at) VALUES (?,?,?,?,?)`,
+			p.CardID, p.PeriodEnd, int64(p.Amount), p.TxID, p.PaidAt); err != nil {
+			return err
+		}
+	}
+	for _, a := range b.Accounts {
+		if _, err := tx.Exec(`INSERT INTO accounts (`+accountColumns+`) VALUES (?,?,?,?,?,?)`,
+			a.ID, a.Name, a.Type, int64(a.OpeningBalance), a.CreatedAt, a.UpdatedAt); err != nil {
+			return err
+		}
+	}
+	for txID, acctID := range b.TransactionAccounts {
+		if _, err := tx.Exec(`INSERT INTO transaction_accounts (transaction_id, account_id) VALUES (?, ?)`, txID, acctID); err != nil {
+			return err
+		}
+	}
+	for _, hd := range b.Holdings {
+		if _, err := tx.Exec(`INSERT INTO holdings (`+holdingColumns+`) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+			hd.ID, hd.Name, hd.Type, hd.UnitsMicro, int64(hd.AvgCost), int64(hd.LastPrice), hd.SchemeCode, hd.LastPriceAt, hd.CreatedAt, hd.UpdatedAt); err != nil {
+			return err
+		}
+	}
 	if _, err := tx.Exec(`UPDATE settings SET currency=?, locale=?, month_format=?, date_format=?, fiscal_year_start=?, pay_cycle_enabled=?, dark_mode=? WHERE id=1`,
 		b.Settings.Currency, b.Settings.Locale, b.Settings.MonthFormat, b.Settings.DateFormat, b.Settings.FiscalYearStart, boolToInt(b.Settings.PayCycleEnabled), boolToInt(b.Settings.DarkMode)); err != nil {
 		return err
@@ -501,6 +556,9 @@ func (s *SQLite) Reset() error {
 	}
 	defer tx.Rollback()
 	for _, stmt := range []string{
+		`DELETE FROM holdings`,
+		`DELETE FROM transaction_accounts`, `DELETE FROM accounts`,
+		`DELETE FROM statement_payments`, `DELETE FROM transaction_cards`, `DELETE FROM cards`,
 		`DELETE FROM transaction_tags`, `DELETE FROM tags`, `DELETE FROM budgets`, `DELETE FROM goals`,
 		`DELETE FROM posted_recurring`, `DELETE FROM gmail_processed`,
 		`DELETE FROM transactions`, `DELETE FROM recurring_items`, `DELETE FROM categories`,

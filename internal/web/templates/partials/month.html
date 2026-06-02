@@ -6,6 +6,28 @@
     <div class="card bg-white dark:bg-gray-800 p-4"><div class="text-xs uppercase text-gray-500">Debits</div><div class="num text-xl font-bold text-red-600">{{formatINR $k.MonthDebits}}</div></div>
     <div class="card bg-yellow-50 dark:bg-gray-800 p-4"><div class="text-xs uppercase text-gray-500">Net Savings</div><div class="num text-xl font-bold {{amountClass $k.MonthNet}}">{{formatINR $k.MonthNet}}</div></div>
   </div>
+  {{- $ins := .Insights}}
+  {{if $ins.HasPrev}}
+  <div class="card bg-white dark:bg-gray-800 p-4 mb-4">
+    <div class="flex items-baseline justify-between mb-2">
+      <h3 class="text-sm font-semibold">Insights vs previous month</h3>
+      <span class="text-sm {{if gt (rupees $ins.ExpenseDelta) 0.0}}text-red-600{{else}}text-green-600{{end}}">
+        Spending {{if gt (rupees $ins.ExpenseDelta) 0.0}}up{{else}}down{{end}} {{formatINR $ins.ExpenseDelta}} ({{pct $ins.ExpenseDeltaPct}})
+      </span>
+    </div>
+    <div class="text-xs text-gray-500 mb-1">Top movers</div>
+    <div class="space-y-1">
+      {{range $ins.TopMovers}}
+      <div class="flex items-center justify-between text-sm">
+        <span>{{.Category}}</span>
+        <span class="num {{if gt (rupees .Delta) 0.0}}text-red-600{{else if lt (rupees .Delta) 0.0}}text-green-600{{else}}text-gray-400{{end}}">
+          {{if gt (rupees .Delta) 0.0}}+{{end}}{{formatINR .Delta}} <span class="text-gray-400">({{formatINR .Prev}} → {{formatINR .This}})</span>
+        </span>
+      </div>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
     <div class="card bg-white dark:bg-gray-800 p-4">
       <h3 class="text-sm font-semibold mb-2">Where Money Went — {{formatMonth .Month}}</h3>

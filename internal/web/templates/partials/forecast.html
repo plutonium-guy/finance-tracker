@@ -1,0 +1,26 @@
+{{define "forecast"}}
+<div id="forecast" hx-get="/partials/forecast?m={{.Month}}" hx-trigger="txChanged from:body" hx-swap="outerHTML">
+  {{- $f := .Forecast}}
+  <div class="card bg-white dark:bg-gray-800 p-4">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div>
+        <div class="text-gray-500 text-xs">Net so far</div>
+        <div class="num font-semibold {{amountClass $f.NetSoFar}}">{{formatINR $f.NetSoFar}}</div>
+      </div>
+      <div>
+        <div class="text-gray-500 text-xs">Expected income</div>
+        <div class="num font-semibold text-green-600">{{formatINR $f.UpcomingIncome}}</div>
+      </div>
+      <div>
+        <div class="text-gray-500 text-xs">Expected bills</div>
+        <div class="num font-semibold text-red-600">{{formatINR $f.UpcomingExpense}}</div>
+      </div>
+      <div>
+        <div class="text-gray-500 text-xs">Projected month-end</div>
+        <div class="num font-bold text-lg {{amountClass $f.ProjectedNet}}">{{formatINR $f.ProjectedNet}}</div>
+      </div>
+    </div>
+    {{if gt $f.DaysLeft 0}}<div class="text-xs text-gray-400 mt-2">{{$f.DaysLeft}} day{{if ne $f.DaysLeft 1}}s{{end}} left this month · projection assumes due recurring items still post.</div>{{end}}
+  </div>
+</div>
+{{end}}

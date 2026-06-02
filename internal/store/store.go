@@ -35,6 +35,12 @@ type Backup struct {
 	Goals        []domain.Goal          `json:"goals,omitempty"`
 	Budgets      []domain.Budget        `json:"budgets,omitempty"`
 	Tags         []domain.Tag           `json:"tags,omitempty"`
+	Cards             []domain.Card             `json:"cards,omitempty"`
+	StatementPayments []domain.StatementPayment `json:"statement_payments,omitempty"`
+	TransactionCards  map[string]string         `json:"transaction_cards,omitempty"` // txID -> cardID
+	Accounts            []domain.Account  `json:"accounts,omitempty"`
+	TransactionAccounts map[string]string `json:"transaction_accounts,omitempty"` // txID -> accountID
+	Holdings            []domain.Holding  `json:"holdings,omitempty"`
 }
 
 // Store is the persistence interface used by the service and web layers.
@@ -98,6 +104,37 @@ type Store interface {
 	// gmail import dedupe
 	WasGmailProcessed(messageID string) (bool, error)
 	MarkGmailProcessed(messageID, txID, processedAt string) error
+
+	// credit cards + billing cycle
+	ListCards() ([]domain.Card, error)
+	GetCard(id string) (domain.Card, error)
+	CreateCard(c domain.Card) error
+	UpdateCard(c domain.Card) error
+	DeleteCard(id string) error
+	CardIDByLast4(last4 string) (string, bool, error)
+	SetTransactionCard(txID, cardID string) error // cardID "" clears the link
+	CardOfTransaction(txID string) (string, error) // "" when none
+	TransactionCardMap() (map[string]string, error)
+	RecordStatementPayment(p domain.StatementPayment) (bool, error) // false if already paid
+	ListStatementPayments(cardID string) ([]domain.StatementPayment, error)
+
+	// accounts
+	ListAccounts() ([]domain.Account, error)
+	GetAccount(id string) (domain.Account, error)
+	CreateAccount(a domain.Account) error
+	UpdateAccount(a domain.Account) error
+	DeleteAccount(id string) error
+	SetTransactionAccount(txID, accountID string) error // "" clears
+	AccountOfTransaction(txID string) (string, error)
+	TransactionAccountMap() (map[string]string, error)
+
+	// investment holdings
+	ListHoldings() ([]domain.Holding, error)
+	GetHolding(id string) (domain.Holding, error)
+	CreateHolding(h domain.Holding) error
+	UpdateHolding(h domain.Holding) error
+	DeleteHolding(id string) error
+	SetHoldingPriceBySchemeCode(schemeCode string, pricePaise domain.Money, at string) (int, error)
 
 	// backup
 	Export() (Backup, error)

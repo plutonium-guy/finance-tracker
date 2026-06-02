@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -33,6 +34,8 @@ var funcMap = template.FuncMap{
 	"amountClass": amountClass,
 	"formatDate":  formatDate,
 	"formatMonth": formatMonth,
+	"formatDay":   func(t time.Time) string { return t.Format("02 Jan 2006") },
+	"formatUnits": domain.FormatUnits,
 	"pct":         func(f float64) string { return fmt.Sprintf("%.1f%%", f*100) },
 	"pct0":        func(f float64) string { return fmt.Sprintf("%.0f%%", f*100) },
 	"barPct":      barPct,
@@ -40,6 +43,9 @@ var funcMap = template.FuncMap{
 	"title":       func(s string) string { return s },
 	"dict":        dict,
 	"upper":       strings.ToUpper,
+	// pathEscape makes a value safe to embed in a URL path segment (e.g. a
+	// category name with spaces, '&', '#', '?').
+	"pathEscape": url.PathEscape,
 }
 
 // flowPalette colors the sankey/flow segments deterministically by index.
@@ -117,7 +123,7 @@ type Renderer struct {
 
 // NewRenderer parses all embedded templates.
 func NewRenderer() (*Renderer, error) {
-	pageNames := []string{"dashboard", "transactions", "recurring", "month", "settings", "planning", "year"}
+	pageNames := []string{"dashboard", "transactions", "recurring", "month", "settings", "planning", "year", "cards", "accounts", "portfolio", "reimbursements"}
 	r := &Renderer{pages: map[string]*template.Template{}}
 
 	for _, name := range pageNames {

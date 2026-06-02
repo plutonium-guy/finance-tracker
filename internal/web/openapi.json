@@ -1,0 +1,249 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Finance Tracker API",
+    "version": "1.0.0",
+    "description": "JSON REST API for the Finance Tracker. All monetary fields are integers in **paise** (₹1 = 100 paise). All endpoints require a bearer token (set `API_PUSH_TOKEN` on the server) sent as `Authorization: Bearer <token>`."
+  },
+  "servers": [{ "url": "/api/v1", "description": "Versioned REST API" }],
+  "security": [{ "bearerAuth": [] }],
+  "tags": [
+    { "name": "transactions" }, { "name": "accounts" }, { "name": "cards" },
+    { "name": "holdings" }, { "name": "recurring" }, { "name": "goals" },
+    { "name": "budgets" }, { "name": "categories" }, { "name": "summary" }, { "name": "actions" }
+  ],
+  "paths": {
+    "/transactions": {
+      "get": {
+        "tags": ["transactions"], "summary": "List transactions",
+        "parameters": [
+          { "name": "m", "in": "query", "schema": { "type": "string", "example": "2026-06" }, "description": "Month filter YYYY-MM" },
+          { "name": "category", "in": "query", "schema": { "type": "string" } },
+          { "name": "type", "in": "query", "schema": { "type": "string", "enum": ["Income", "Expense", "Transfer"] } },
+          { "name": "q", "in": "query", "schema": { "type": "string" }, "description": "Substring match on description" },
+          { "name": "sort", "in": "query", "schema": { "type": "string", "enum": ["date", "amount", "description", "category", "type"] } },
+          { "name": "order", "in": "query", "schema": { "type": "string", "enum": ["asc", "desc"] } },
+          { "name": "page", "in": "query", "schema": { "type": "integer" } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Transaction" } } } } } }
+      },
+      "post": {
+        "tags": ["transactions"], "summary": "Create a transaction",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TransactionInput" } } } },
+        "responses": { "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Transaction" } } } }, "400": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/transactions/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["transactions"], "summary": "Get a transaction", "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Transaction" } } } }, "404": { "$ref": "#/components/responses/Error" } } },
+      "put": { "tags": ["transactions"], "summary": "Update a transaction", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TransactionInput" } } } }, "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Transaction" } } } }, "404": { "$ref": "#/components/responses/Error" } } },
+      "delete": { "tags": ["transactions"], "summary": "Delete a transaction", "responses": { "204": { "description": "Deleted" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/accounts": {
+      "get": { "tags": ["accounts"], "summary": "List accounts", "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Account" } } } } } } },
+      "post": { "tags": ["accounts"], "summary": "Create an account", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Account" } } } }, "responses": { "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Account" } } } }, "400": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/accounts/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["accounts"], "summary": "Get an account", "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Account" } } } }, "404": { "$ref": "#/components/responses/Error" } } },
+      "put": { "tags": ["accounts"], "summary": "Update an account", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Account" } } } }, "responses": { "200": { "description": "OK" }, "404": { "$ref": "#/components/responses/Error" } } },
+      "delete": { "tags": ["accounts"], "summary": "Delete an account", "responses": { "204": { "description": "Deleted" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/cards": {
+      "get": { "tags": ["cards"], "summary": "List cards", "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Card" } } } } } } },
+      "post": { "tags": ["cards"], "summary": "Create a card", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Card" } } } }, "responses": { "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Card" } } } }, "400": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/cards/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["cards"], "summary": "Get a card", "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Card" } } } }, "404": { "$ref": "#/components/responses/Error" } } },
+      "put": { "tags": ["cards"], "summary": "Update a card", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Card" } } } }, "responses": { "200": { "description": "OK" }, "404": { "$ref": "#/components/responses/Error" } } },
+      "delete": { "tags": ["cards"], "summary": "Delete a card", "responses": { "204": { "description": "Deleted" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/holdings": {
+      "get": { "tags": ["holdings"], "summary": "List holdings", "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Holding" } } } } } } },
+      "post": { "tags": ["holdings"], "summary": "Create a holding", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Holding" } } } }, "responses": { "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Holding" } } } }, "400": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/holdings/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["holdings"], "summary": "Get a holding", "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Holding" } } } }, "404": { "$ref": "#/components/responses/Error" } } },
+      "put": { "tags": ["holdings"], "summary": "Update a holding", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Holding" } } } }, "responses": { "200": { "description": "OK" }, "404": { "$ref": "#/components/responses/Error" } } },
+      "delete": { "tags": ["holdings"], "summary": "Delete a holding", "responses": { "204": { "description": "Deleted" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/recurring": {
+      "get": { "tags": ["recurring"], "summary": "List recurring items", "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/RecurringItem" } } } } } } },
+      "post": { "tags": ["recurring"], "summary": "Create a recurring item", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RecurringItem" } } } }, "responses": { "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RecurringItem" } } } }, "400": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/recurring/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["recurring"], "summary": "Get a recurring item", "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RecurringItem" } } } }, "404": { "$ref": "#/components/responses/Error" } } },
+      "put": { "tags": ["recurring"], "summary": "Update a recurring item", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RecurringItem" } } } }, "responses": { "200": { "description": "OK" }, "404": { "$ref": "#/components/responses/Error" } } },
+      "delete": { "tags": ["recurring"], "summary": "Delete a recurring item", "responses": { "204": { "description": "Deleted" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/goals": {
+      "get": { "tags": ["goals"], "summary": "List goals", "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Goal" } } } } } } },
+      "post": { "tags": ["goals"], "summary": "Create a goal", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Goal" } } } }, "responses": { "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Goal" } } } }, "400": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/goals/{id}": {
+      "parameters": [{ "$ref": "#/components/parameters/Id" }],
+      "get": { "tags": ["goals"], "summary": "Get a goal", "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Goal" } } } }, "404": { "$ref": "#/components/responses/Error" } } },
+      "put": { "tags": ["goals"], "summary": "Update a goal", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Goal" } } } }, "responses": { "200": { "description": "OK" }, "404": { "$ref": "#/components/responses/Error" } } },
+      "delete": { "tags": ["goals"], "summary": "Delete a goal", "responses": { "204": { "description": "Deleted" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/budgets": {
+      "get": { "tags": ["budgets"], "summary": "List budgets", "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Budget" } } } } } } },
+      "put": { "tags": ["budgets"], "summary": "Set (upsert) a budget", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Budget" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/budgets/{category}": {
+      "parameters": [{ "name": "category", "in": "path", "required": true, "schema": { "type": "string" } }],
+      "delete": { "tags": ["budgets"], "summary": "Delete a budget", "responses": { "204": { "description": "Deleted" } } }
+    },
+    "/categories": {
+      "get": { "tags": ["categories"], "summary": "List categories", "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Category" } } } } } } },
+      "post": { "tags": ["categories"], "summary": "Add a category", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Category" } } } }, "responses": { "201": { "description": "Created" }, "400": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/net-worth": {
+      "get": { "tags": ["summary"], "summary": "Net worth summary", "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NetWorth" } } } } } }
+    },
+    "/gmail/sync": { "post": { "tags": ["actions"], "summary": "Import credit-card spend emails from Gmail", "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "scanned": { "type": "integer" }, "imported": { "type": "integer" }, "skipped": { "type": "integer" } } } } } }, "503": { "$ref": "#/components/responses/Error" } } } },
+    "/nav/sync": { "post": { "tags": ["actions"], "summary": "Refresh mutual-fund NAVs from AMFI", "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "fetched": { "type": "integer" }, "updated": { "type": "integer" } } } } } }, "503": { "$ref": "#/components/responses/Error" } } } },
+    "/alerts/run": { "post": { "tags": ["actions"], "summary": "Run the alert check (sends Telegram if any)", "responses": { "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object", "properties": { "alerts": { "type": "array", "items": { "type": "string" } }, "count": { "type": "integer" }, "sent": { "type": "boolean" } } } } } } } } }
+  },
+  "components": {
+    "securitySchemes": { "bearerAuth": { "type": "http", "scheme": "bearer" } },
+    "parameters": { "Id": { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } } },
+    "responses": {
+      "Error": { "description": "Error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+    },
+    "schemas": {
+      "Error": { "type": "object", "properties": { "error": { "type": "string" } } },
+      "Transaction": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "date": { "type": "string", "example": "2026-06-01" },
+          "description": { "type": "string" },
+          "amount": { "type": "integer", "description": "Paise; always > 0. Direction comes from type." },
+          "type": { "type": "string", "enum": ["Income", "Expense", "Transfer"] },
+          "payment_method": { "type": "string", "enum": ["UPI", "Credit Card", "Debit Card", "Cash", "Bank Transfer", "NetBanking", "Cheque", "Other"] },
+          "category": { "type": "string" },
+          "notes": { "type": "string", "nullable": true },
+          "created_at": { "type": "string" },
+          "updated_at": { "type": "string" }
+        }
+      },
+      "TransactionInput": {
+        "type": "object",
+        "required": ["amount", "description"],
+        "properties": {
+          "date": { "type": "string", "example": "2026-06-01", "description": "Defaults to today." },
+          "description": { "type": "string" },
+          "amount": { "type": "integer", "description": "Paise, > 0." },
+          "type": { "type": "string", "enum": ["Income", "Expense", "Transfer"], "default": "Expense" },
+          "payment_method": { "type": "string", "default": "UPI" },
+          "category": { "type": "string", "description": "Defaults to Miscellaneous; must exist." },
+          "notes": { "type": "string" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "card_id": { "type": "string" },
+          "account_id": { "type": "string" }
+        }
+      },
+      "Account": {
+        "type": "object",
+        "required": ["name", "type"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "type": { "type": "string", "enum": ["Bank", "Cash", "Wallet", "Other"] },
+          "opening_balance": { "type": "integer", "description": "Paise (may be negative)." },
+          "created_at": { "type": "string" },
+          "updated_at": { "type": "string" }
+        }
+      },
+      "Card": {
+        "type": "object",
+        "required": ["name", "statement_day"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "last4": { "type": "string" },
+          "limit": { "type": "integer", "description": "Credit limit in paise." },
+          "statement_day": { "type": "integer", "minimum": 1, "maximum": 28 },
+          "due_offset_days": { "type": "integer", "minimum": 0, "maximum": 60 },
+          "created_at": { "type": "string" },
+          "updated_at": { "type": "string" }
+        }
+      },
+      "Holding": {
+        "type": "object",
+        "required": ["name", "type", "units_micro"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "type": { "type": "string", "enum": ["Mutual Fund", "Stock", "ETF", "Gold", "Crypto", "Other"] },
+          "units_micro": { "type": "integer", "description": "Units × 1,000,000 (so 142.317 units = 142317000)." },
+          "avg_cost": { "type": "integer", "description": "Paise per unit." },
+          "last_price": { "type": "integer", "description": "Paise per unit; 0 = unknown. Auto-set by NAV sync for MFs." },
+          "scheme_code": { "type": "string", "description": "AMFI scheme code (MF) or ticker." },
+          "last_price_at": { "type": "string" },
+          "created_at": { "type": "string" },
+          "updated_at": { "type": "string" }
+        }
+      },
+      "RecurringItem": {
+        "type": "object",
+        "required": ["name", "amount", "type", "frequency", "start_date"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "category": { "type": "string" },
+          "amount": { "type": "integer", "description": "Paise, > 0." },
+          "frequency": { "type": "string", "enum": ["Monthly", "Quarterly", "Half-Yearly", "Yearly", "Weekly", "One-time"] },
+          "type": { "type": "string", "enum": ["Income", "Expense", "Transfer"] },
+          "start_date": { "type": "string", "example": "2026-01-01" },
+          "end_date": { "type": "string", "nullable": true },
+          "payment_method": { "type": "string" },
+          "active": { "type": "boolean" },
+          "notes": { "type": "string", "nullable": true }
+        }
+      },
+      "Goal": {
+        "type": "object",
+        "required": ["name", "target"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "target": { "type": "integer", "description": "Paise, > 0." },
+          "saved": { "type": "integer", "description": "Paise." },
+          "target_date": { "type": "string", "nullable": true },
+          "notes": { "type": "string", "nullable": true }
+        }
+      },
+      "Budget": {
+        "type": "object",
+        "required": ["category", "limit"],
+        "properties": {
+          "category": { "type": "string" },
+          "limit": { "type": "integer", "description": "Monthly limit in paise." }
+        }
+      },
+      "Category": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "is_default": { "type": "boolean" }
+        }
+      },
+      "NetWorth": {
+        "type": "object",
+        "properties": {
+          "accounts": { "type": "integer", "description": "Paise." },
+          "investments": { "type": "integer", "description": "Paise." },
+          "card_outstanding": { "type": "integer", "description": "Paise." },
+          "total": { "type": "integer", "description": "Paise: accounts + investments − card_outstanding." }
+        }
+      }
+    }
+  }
+}

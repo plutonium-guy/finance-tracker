@@ -20,6 +20,7 @@ type monthDetailVM struct {
 	MonthChartJSON any // doughnut struct; html/template JSON-encodes it in the island
 	Categories     []service.CategoryStat
 	Txs            []domain.Transaction
+	Insights       service.MonthInsights
 }
 
 type monthPageVM struct {
@@ -67,6 +68,7 @@ func (h *Handler) buildMonthDetail(month string) monthDetailVM {
 		MonthChartJSON: d,
 		Categories:     cats,
 		Txs:            monthTxs,
+		Insights:       service.MonthInsightsFor(allTx, month),
 	}
 }
 

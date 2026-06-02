@@ -20,6 +20,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"finance-tracker/internal/gmailsync"
+	"finance-tracker/internal/navsync"
 	"finance-tracker/internal/service"
 	"finance-tracker/internal/store"
 	"finance-tracker/internal/telegrambot"
@@ -75,6 +76,15 @@ func main() {
 		slog.Info("demo data seeded (SEED_DEMO=true)")
 	}
 
+	// Optionally post this month's due recurring items on startup.
+	if os.Getenv("RECURRING_AUTOFIRE") == "true" {
+		if n, err := svc.PostDue(svc.CurrentMonth()); err != nil {
+			slog.Error("recurring auto-fire", "err", err)
+		} else if n > 0 {
+			slog.Info("recurring auto-fire", "posted", n, "month", svc.CurrentMonth())
+		}
+	}
+
 	// Optional Telegram bot: add transactions by messaging the bot.
 	botCtx, stopBot := context.WithCancel(context.Background())
 	defer stopBot()
@@ -105,6 +115,12 @@ func main() {
 
 	// Gmail credit-card import (scheduled + POST /gmail/sync, /api/gmail/sync).
 	startGmailSync(botCtx, svc, h)
+
+	// Optional scheduled proactive alerts (budgets, card dues, recurring) via Telegram.
+	startAlerts(botCtx, h, botClient != nil)
+
+	// Mutual-fund NAV refresh (scheduled + POST /portfolio/sync, /api/nav/sync).
+	startNavSync(botCtx, svc, h)
 
 	handler := h.Routes(http.FileServer(http.FS(web.StaticFS())))
 
@@ -258,6 +274,94 @@ func startGmailSync(ctx context.Context, svc *service.Service, h *web.Handler) {
 				return
 			case <-ticker.C:
 				run()
+			}
+		}
+	}()
+}
+
+// navRunner adapts a *navsync.Syncer to the web.NavSyncer interface.
+type navRunner struct{ s *navsync.Syncer }
+
+func (n navRunner) Run(ctx context.Context) (web.NavResult, error) {
+	r, err := n.s.Run(ctx)
+	return web.NavResult{Fetched: r.Fetched, Updated: r.Updated}, err
+}
+
+// startNavSync wires the AMFI NAV refresh (always enabled — no credentials
+// needed) and runs it on a schedule (NAV_SYNC_INTERVAL, default 12h).
+func startNavSync(ctx context.Context, svc *service.Service, h *web.Handler) {
+	syncer := navsync.NewSyncer(navsync.NewHTTPFetcher(), svc.Store, time.Now)
+	h.EnableNav(navRunner{syncer})
+
+	interval := 12 * time.Hour
+	if d, err := time.ParseDuration(os.Getenv("NAV_SYNC_INTERVAL")); err == nil && d > 0 {
+		interval = d
+	}
+	slog.Info("nav sync enabled", "interval", interval.String())
+	go func() {
+		first := time.NewTimer(60 * time.Second)
+		defer first.Stop()
+		select {
+		case <-ctx.Done():
+			return
+		case <-first.C:
+			navRun(ctx, syncer)
+		}
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				navRun(ctx, syncer)
+			}
+		}
+	}()
+}
+
+func navRun(ctx context.Context, syncer *navsync.Syncer) {
+	res, err := syncer.Run(ctx)
+	if err != nil {
+		slog.Error("nav sync", "err", err)
+		return
+	}
+	if res.Updated > 0 {
+		slog.Info("nav sync", "fetched", res.Fetched, "updated", res.Updated)
+	}
+}
+
+// startAlerts schedules proactive Telegram alerts when ALERTS_INTERVAL is set
+// and the bot is available. The /api/alerts/run endpoint works regardless (for cron).
+func startAlerts(ctx context.Context, h *web.Handler, botEnabled bool) {
+	v := os.Getenv("ALERTS_INTERVAL")
+	if v == "" {
+		return
+	}
+	interval, err := time.ParseDuration(v)
+	if err != nil || interval <= 0 {
+		slog.Warn("alerts: invalid ALERTS_INTERVAL, scheduler disabled", "value", v)
+		return
+	}
+	if !botEnabled {
+		slog.Info("alerts: ALERTS_INTERVAL set but Telegram bot disabled; use POST /api/alerts/run instead")
+		return
+	}
+	slog.Info("scheduled alerts enabled", "interval", interval.String())
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				alerts, sent, err := h.RunAlerts(ctx)
+				if err != nil {
+					slog.Error("alerts run", "err", err)
+					continue
+				}
+				slog.Info("alerts run", "count", len(alerts), "sent", sent)
 			}
 		}
 	}()

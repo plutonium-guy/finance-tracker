@@ -6,7 +6,12 @@
       <form hx-post="/transactions/import" hx-encoding="multipart/form-data" hx-target="#flash" hx-swap="innerHTML" class="flex gap-1 items-center">
         <input type="file" name="file" accept=".csv,text/csv" required class="text-xs w-40"
                title="CSV: app export or a bank statement (Date, Description, Amount or Debit/Credit)">
-        <button class="px-2 py-1.5 text-sm rounded border">Import</button>
+        <button class="px-2 py-1.5 text-sm rounded border">Import CSV</button>
+      </form>
+      <form hx-post="/transactions/import-pdf" hx-encoding="multipart/form-data" hx-target="#flash" hx-swap="innerHTML" class="flex gap-1 items-center">
+        <input type="file" name="file" accept="application/pdf,.pdf" required class="text-xs w-40"
+               title="Best-effort statement PDF import (review imported rows)">
+        <button class="px-2 py-1.5 text-sm rounded border">Import PDF</button>
       </form>
       <a class="px-3 py-1.5 text-sm rounded border" href="/transactions/export"
          onclick="this.href='/transactions/export?'+new URLSearchParams(new FormData(document.getElementById('filters')))">Export CSV</a>

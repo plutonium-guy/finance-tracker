@@ -1,0 +1,41 @@
+{{define "reimb_list"}}
+<div id="reimb-list">
+  {{- $r := .Reimb}}
+  <div class="card bg-white dark:bg-gray-800 p-4 mb-4 grid grid-cols-2 gap-4">
+    <div>
+      <div class="text-gray-500 text-xs">Outstanding (owed to you)</div>
+      <div class="num font-bold text-lg text-blue-700 dark:text-blue-300">{{formatINR $r.Outstanding}}</div>
+    </div>
+    <div>
+      <div class="text-gray-500 text-xs">Settled</div>
+      <div class="num font-semibold text-green-600">{{formatINR $r.SettledTotal}}</div>
+    </div>
+  </div>
+
+  <div class="card bg-white dark:bg-gray-800 overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="text-left text-gray-500 border-b dark:border-gray-700">
+        <tr><th class="px-3 py-2">Date</th><th class="px-3 py-2">Description</th><th class="px-3 py-2 text-right">Amount</th><th class="px-3 py-2">Status</th><th class="px-3 py-2"></th></tr>
+      </thead>
+      <tbody>
+        {{- if $r.Items}}
+        {{- range $r.Items}}
+        {{- $t := .Tx}}
+        <tr class="border-b dark:border-gray-700 {{if .Settled}}opacity-60{{end}}">
+          <td class="px-3 py-2 num">{{formatDate $t.Date}}</td>
+          <td class="px-3 py-2">{{$t.Description}}</td>
+          <td class="px-3 py-2 num text-right">{{formatINR $t.Amount}}</td>
+          <td class="px-3 py-2">{{if .Settled}}<span class="px-1.5 py-0.5 rounded bg-green-100 text-green-700 text-xs">✓ Settled</span>{{else}}<span class="px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200 text-xs">Outstanding</span>{{end}}</td>
+          <td class="px-3 py-2 text-right">
+            <button class="text-blue-700 text-sm" hx-post="/reimbursements/{{$t.ID}}/settle" hx-target="#reimb-list" hx-swap="outerHTML">{{if .Settled}}Mark unsettled{{else}}Mark settled{{end}}</button>
+          </td>
+        </tr>
+        {{- end}}
+        {{- else}}
+        <tr><td colspan="5" class="text-center text-gray-500 py-10">No reimbursable expenses. Add the <code>reimbursable</code> tag to a transaction to track it here.</td></tr>
+        {{- end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}
