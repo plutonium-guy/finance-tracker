@@ -1,0 +1,7 @@
+{{define "content"}}
+<div class="space-y-4">
+  <h1 class="text-xl font-bold">Reimbursements</h1>
+  <p class="text-sm text-gray-500">Tag any expense <code>reimbursable</code> (in the transaction's Tags field) and it shows up here. Mark it settled once you're paid back.</p>
+  {{template "reimb_list" .}}
+</div>
+{{end}}

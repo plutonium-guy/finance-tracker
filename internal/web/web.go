@@ -110,6 +110,7 @@ func (h *Handler) Routes(static http.Handler) http.Handler {
 		r.Get("/export", h.TransactionsExport)
 		r.Post("/", h.TransactionCreate)
 		r.Post("/import", h.TransactionsImport)
+		r.Post("/import-pdf", h.TransactionsImportPDF)
 		r.Post("/bulk", h.TransactionsBulk)
 		r.Get("/{id}/edit", h.TransactionEdit)
 		r.Put("/{id}", h.TransactionUpdate)
@@ -186,6 +187,10 @@ func (h *Handler) Routes(static http.Handler) http.Handler {
 	// Year-end sankey.
 	r.Get("/year", h.YearPage)
 	r.Get("/year/detail", h.YearDetail)
+
+	r.Get("/reimbursements", h.ReimbursementsPage)
+	r.Get("/reimbursements/list", h.ReimbursementsList)
+	r.Post("/reimbursements/{id}/settle", h.ReimbursementToggle)
 
 	r.Get("/settings", h.SettingsPage)
 	r.Post("/settings", h.SettingsSave)

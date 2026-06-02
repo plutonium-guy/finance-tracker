@@ -1,10 +1,12 @@
 package web
 
 import (
+	"bytes"
 	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,6 +16,7 @@ import (
 	"github.com/google/uuid"
 
 	"finance-tracker/internal/domain"
+	"finance-tracker/internal/pdfimport"
 	"finance-tracker/internal/store"
 )
 
@@ -528,6 +531,46 @@ func (h *Handler) TransactionsImport(w http.ResponseWriter, r *http.Request) {
 	}
 	txTrigger(w)
 	h.flash(w, fmt.Sprintf("Imported %d transactions (%d skipped)", imported, skipped))
+}
+
+// TransactionsImportPDF is a best-effort import of a bank/card statement PDF.
+// Layouts are bank-specific, so detected rows should be reviewed afterwards.
+func (h *Handler) TransactionsImportPDF(w http.ResponseWriter, r *http.Request) {
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		h.flash(w, "No file uploaded")
+		return
+	}
+	defer file.Close()
+	data, err := io.ReadAll(http.MaxBytesReader(w, file, 20<<20)) // 20MB cap
+	if err != nil {
+		h.flash(w, "Could not read file")
+		return
+	}
+	lines, err := pdfimport.ExtractLines(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		w.Header().Set("HX-Retarget", "#flash")
+		h.flash(w, "Could not read PDF (is it a real, non-scanned statement?): "+err.Error())
+		return
+	}
+	cands := pdfimport.ParseLines(lines)
+	now := h.svc.Now().UTC().Format(time.RFC3339)
+	imported := 0
+	for _, c := range cands {
+		if c.Description == "" || c.Amount <= 0 {
+			continue
+		}
+		t := domain.Transaction{
+			ID: uuid.NewString(), Date: c.Date, Description: c.Description,
+			Amount: domain.ToPaise(c.Amount), Type: c.Type, PaymentMethod: domain.OtherMethod,
+			Category: "Miscellaneous", CreatedAt: now, UpdatedAt: now,
+		}
+		if h.svc.Store.CreateTransaction(t) == nil {
+			imported++
+		}
+	}
+	txTrigger(w)
+	h.flash(w, fmt.Sprintf("PDF: imported %d transaction(s) from %d detected lines — review and re-categorise.", imported, len(cands)))
 }
 
 // indexHeaders maps lowercased trimmed header names to their column index.
